@@ -18,9 +18,16 @@
             <h2>Invoice Details</h2>
             <div class="control-group">
                 <h3>Bill To:</h3>
-                <input type="text" id="client-name" placeholder="Client Name / Department" value="Mario Fachini / Accounting Department">
-                <input type="text" id="client-company" placeholder="Company Name" value="IWDNow Marketing & Publishing">
-                <input type="email" id="client-email" placeholder="Email Address" value="accounting@iwdnow.com">
+                <!-- The hardcoded 'value' attributes are now REMOVED -->
+                <input type="text" id="client-name" placeholder="Client Name / Department">
+                <input type="text" id="client-company" placeholder="Company Name">
+                <input type="email" id="client-email" placeholder="Email Address">
+                
+                <!-- NEW BUTTONS FOR SAVING DEFAULTS -->
+                <div class="default-buttons">
+                    <button id="save-defaults-btn" class="util-button">Save as Default</button>
+                    <button id="clear-defaults-btn" class="util-button-secondary">Clear Default</button>
+                </div>
             </div>
             <div class="control-group">
                 <h3>Select Timesheet:</h3>
@@ -38,8 +45,6 @@
                 </div>
                 <button id="fetch-data-btn">Get Timesheet Data</button>
             </div>
-            
-            <!-- NEW BILLING METHOD SECTION -->
             <div class="control-group">
                 <h3>Billing Method</h3>
                 <select id="billing-method">
@@ -47,19 +52,16 @@
                     <option value="fixed">Fixed Rate</option>
                 </select>
                 <div class="billing-method-inputs">
-                    <!-- Input for Hourly Rate (visible by default) -->
                     <div id="hourly-rate-group">
                         <label for="hourly-rate">Hourly Rate ($)</label>
                         <input type="number" id="hourly-rate" value="5.00" step="0.01" min="0">
                     </div>
-                    <!-- Input for Fixed Rate (hidden by default) -->
                     <div id="fixed-rate-group" class="hidden">
                         <label for="fixed-rate">Total Project Amount ($)</label>
                         <input type="number" id="fixed-rate" value="500.00" step="0.01" min="0">
                     </div>
                 </div>
             </div>
-            
             <div class="control-group">
                 <h3>Payment Info:</h3>
                 <input type="text" id="payment-method" placeholder="Payment Method (e.g., PayPal, Bank Transfer)">
