@@ -1,20 +1,29 @@
 document.addEventListener('DOMContentLoaded', function() {
     // --- CONFIGURATION ---
-    const SPREADSHEET_ID = '1-54sXsMbJmZlm-ecaNRjP9weSf9sBBBWs2XA0CGNhgg'; // 👈 Replace with your Spreadsheet ID
-    const API_KEY = 'YOUR_API_KEY'; // 👈 Replace with your API Key
+    const SPREADSHEET_ID = '1-54sXsMbJmZlm-ecaNRjP9weSf9sBBBWs2XA0CGNhgg';
+    const API_KEY = 'AIzaSyDC19jZi4kwBD-3Pr0bFIdESTw5FrAZO8M';
+
+    // --- GLOBAL STATE ---
+    let totalMinutes = 0;
 
     // --- ELEMENT SELECTORS ---
     const inputs = {
         clientName: document.getElementById('client-name'),
         clientCompany: document.getElementById('client-company'),
         clientEmail: document.getElementById('client-email'),
-        sheetSelector: document.getElementById('sheet-selector'), // New selector
+        sheetSelector: document.getElementById('sheet-selector'),
         startDate: document.getElementById('start-date'),
         endDate: document.getElementById('end-date'),
         paymentMethod: document.getElementById('payment-method'),
         paymentDetails: document.getElementById('payment-details'),
+        billingMethod: document.getElementById('billing-method'),
+        hourlyRate: document.getElementById('hourly-rate'),
+        fixedRate: document.getElementById('fixed-rate'),
     };
-
+    const inputGroups = {
+        hourlyRate: document.getElementById('hourly-rate-group'),
+        fixedRate: document.getElementById('fixed-rate-group'),
+    };
     const previews = {
         invoiceId: document.getElementById('preview-invoice-id'),
         invoiceDate: document.getElementById('preview-invoice-date'),
@@ -26,24 +35,67 @@ document.addEventListener('DOMContentLoaded', function() {
         paymentDetails: document.getElementById('preview-payment-details'),
         invoiceBody: document.getElementById('invoice-body'),
         totalHours: document.getElementById('total-hours'),
+        totalAmount: document.getElementById('total-amount'),
+        totalAmountLabel: document.getElementById('total-amount-label'),
     };
-
     const buttons = {
         fetchData: document.getElementById('fetch-data-btn'),
         generatePdf: document.getElementById('generate-pdf-btn'),
     };
 
-    // --- FUNCTIONS ---
+    // NEW HELPER FUNCTION TO NORMALIZE TIME FORMAT
+    function formatTime(timeString) {
+        if (!timeString || timeString.toUpperCase().includes('AM') || timeString.toUpperCase().includes('PM')) {
+            return timeString; // Already in a 12-hour format or empty
+        }
 
-    // NEW: Fetches all sheet names and populates the dropdown
+        try {
+            let [hours, minutes] = timeString.split(':').map(Number);
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // the hour '0' should be '12'
+            const minutesStr = String(minutes).padStart(2, '0');
+            return `${hours}:${minutesStr} ${ampm}`;
+        } catch (e) {
+            return timeString; // If parsing fails, return original string
+        }
+    }
+
+    function handleBillingMethodChange() {
+        const selectedMethod = inputs.billingMethod.value;
+        if (selectedMethod === 'hourly') {
+            inputGroups.hourlyRate.classList.remove('hidden');
+            inputGroups.fixedRate.classList.add('hidden');
+        } else {
+            inputGroups.hourlyRate.classList.add('hidden');
+            inputGroups.fixedRate.classList.remove('hidden');
+        }
+        calculateAndDisplayTotals();
+    }
+
+    function calculateAndDisplayTotals() {
+        const method = inputs.billingMethod.value;
+        let totalAmount = 0;
+
+        if (method === 'hourly') {
+            const hourlyRate = parseFloat(inputs.hourlyRate.value) || 0;
+            const totalDecimalHours = totalMinutes / 60;
+            totalAmount = totalDecimalHours * hourlyRate;
+            previews.totalAmountLabel.textContent = 'Total Amount';
+        } else {
+            totalAmount = parseFloat(inputs.fixedRate.value) || 0;
+            previews.totalAmountLabel.textContent = 'Fixed Project Total';
+        }
+        previews.totalAmount.textContent = `$${totalAmount.toFixed(2)}`;
+    }
+
     async function populateSheetDropdown() {
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?key=${API_KEY}`;
         try {
             const response = await fetch(url);
             if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
             const data = await response.json();
-            
-            inputs.sheetSelector.innerHTML = ''; // Clear "Loading..."
+            inputs.sheetSelector.innerHTML = '';
             data.sheets.forEach(sheet => {
                 const option = document.createElement('option');
                 option.value = sheet.properties.title;
@@ -56,128 +108,112 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Generate a unique invoice ID
-    function generateInvoiceId() {
-        return `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    }
+    function generateInvoiceId() { return `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`; }
 
-    // Update preview pane based on input fields
     function updatePreview() {
         previews.clientName.textContent = inputs.clientName.value || 'Client Name';
         previews.clientCompany.textContent = inputs.clientCompany.value || 'Company Name';
         previews.clientEmail.textContent = inputs.clientEmail.value || 'Email Address';
         previews.paymentMethod.textContent = inputs.paymentMethod.value || 'N/A';
         previews.paymentDetails.textContent = inputs.paymentDetails.value || 'N/A';
-
         const start = inputs.startDate.value ? new Date(inputs.startDate.value).toLocaleDateString() : '...';
         const end = inputs.endDate.value ? new Date(inputs.endDate.value).toLocaleDateString() : '...';
         previews.billingPeriod.textContent = `${start} – ${end}`;
     }
 
-    // MODIFIED: Fetches data from the SELECTED sheet and filters by date
-    async function fetchAndDisplayData() {
+ async function fetchAndDisplayData() {
+        totalMinutes = 0;
+        previews.invoiceBody.innerHTML = '';
         const selectedSheet = inputs.sheetSelector.value;
-        const startDate = new Date(inputs.startDate.value);
-        const endDate = new Date(inputs.endDate.value);
-
-        if (!selectedSheet) {
-            alert('Please select a timesheet from the dropdown.');
+        if (!selectedSheet || !inputs.startDate.value || !inputs.endDate.value) {
+            alert('Please select a timesheet and a valid date range.');
             return;
         }
-        if (!inputs.startDate.value || !inputs.endDate.value) {
-            alert('Please select a valid start and end date for the billing period.');
-            return;
-        }
-
-        // Use encodeURIComponent to handle sheet names with spaces or special characters
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(selectedSheet)}?key=${API_KEY}`;
-
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/'${encodeURIComponent(selectedSheet)}'!A:G?key=${API_KEY}`;
         try {
             const response = await fetch(url);
             if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
             const data = await response.json();
-            
-            previews.invoiceBody.innerHTML = ''; 
-            let totalDuration = 0;
-
             if (!data.values || data.values.length <= 1) {
-                 previews.invoiceBody.innerHTML = '<tr><td colspan="3">No data found in this sheet.</td></tr>';
-                 previews.totalHours.textContent = "0.00";
-                 return;
+                previews.invoiceBody.innerHTML = '<tr><td colspan="5">No data found in this sheet.</td></tr>';
+            } else {
+                const rows = data.values.slice(1);
+                const filteredRows = rows.filter(row => {
+                    if (!row[1]) return false;
+                    const rowDate = new Date(row[1]);
+                    return new Date(inputs.startDate.value) <= rowDate && rowDate <= new Date(inputs.endDate.value);
+                });
+                if (filteredRows.length === 0) {
+                    previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No entries found for the selected period.</td></tr>';
+                } else {
+                    filteredRows.forEach(row => {
+                        const [, date, rawTimeFrom, rawTimeTo, durationStr, tasks] = row;
+                        
+                        // THIS IS THE UPDATED SECTION
+                        const timeFrom = formatTime(rawTimeFrom || ''); // Format the time
+                        const timeTo = formatTime(rawTimeTo || '');     // Format the time
+
+                        const [hours, minutes] = (durationStr || '0:0').split(':').map(Number);
+                        totalMinutes += (hours || 0) * 60 + (minutes || 0);
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${new Date(date).toLocaleDateString()}</td>
+                            <td>${tasks || ''}</td>
+                            <td>${timeFrom}</td>
+                            <td>${timeTo}</td>
+                            <td>${durationStr || '0:00'}</td>
+                        `;
+                        previews.invoiceBody.appendChild(tr);
+                    });
+                }
             }
-
-            const rows = data.values.slice(1);
-            const filteredRows = rows.filter(row => {
-                if (!row[1]) return false; // Skip rows with no date in column B
-                const rowDate = new Date(row[1]);
-                return rowDate >= startDate && rowDate <= endDate;
-            });
-
-            if (filteredRows.length === 0) {
-                 previews.invoiceBody.innerHTML = '<tr><td colspan="3">No entries found for the selected period.</td></tr>';
-            }
-
-            filteredRows.forEach(row => {
-                const date = new Date(row[1]).toLocaleDateString();
-                const tasks = row[6] || 'N/A'; // Column G for Tasks/Notes
-                const durationStr = row[4] || '0:0'; // Column E for Duration
-                
-                const [hours, minutes] = durationStr.split(':').map(Number);
-                const decimalDuration = (hours || 0) + ((minutes || 0) / 60);
-                totalDuration += decimalDuration;
-
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${date}</td>
-                    <td>${tasks}</td>
-                    <td>${decimalDuration.toFixed(2)}</td>
-                `;
-                previews.invoiceBody.appendChild(tr);
-            });
-
-            previews.totalHours.textContent = totalDuration.toFixed(2);
-
+            const totalHours = Math.floor(totalMinutes / 60);
+            const remainingMinutes = totalMinutes % 60;
+            previews.totalHours.textContent = `${String(totalHours).padStart(2, '0')}:${String(remainingMinutes).padStart(2, '0')}`;
+            calculateAndDisplayTotals();
         } catch (error) {
             console.error('Error fetching sheet data:', error);
             alert('Failed to fetch data from Google Sheet. Check console for errors.');
         }
     }
-    
-    // Generate PDF from the preview element
-    function generatePdf() {
-        const invoiceElement = document.getElementById('invoice-preview');
-        const clientName = inputs.clientCompany.value || 'Invoice';
-        const invoiceId = previews.invoiceId.textContent;
-        
-        const opt = {
-            margin: 0.5,
-            filename: `${clientName}_${invoiceId}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-        };
 
-        html2pdf().from(invoiceElement).set(opt).save();
-    }
+function generatePdf() {
+    // THIS IS THE NEW LINE THAT FIXES THE TOP MARGIN
+    window.scrollTo(0, 0);
+
+    const invoiceElement = document.getElementById('invoice-preview');
+    const clientName = inputs.clientCompany.value || 'Invoice';
+    const invoiceId = previews.invoiceId.textContent;
+
+    const opt = {
+        margin:       [0.5, 0.25, 0.5, 0.25],
+        filename:     `${clientName}_${invoiceId}.pdf`,
+        pagebreak:    { mode: 'css', avoid: ['thead', 'tr', '.invoice-footer'] },
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  {
+            scale: 2,
+            useCORS: true
+        },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+
+    html2pdf().from(invoiceElement).set(opt).save();
+}
 
     // --- INITIALIZATION & EVENT LISTENERS ---
-
-    // Set initial static values
     previews.invoiceId.textContent = generateInvoiceId();
     previews.invoiceDate.textContent = new Date().toLocaleDateString();
-
-    // Add listeners to all input fields for live updates
+    inputs.billingMethod.addEventListener('change', handleBillingMethodChange);
+    inputs.hourlyRate.addEventListener('input', calculateAndDisplayTotals);
+    inputs.fixedRate.addEventListener('input', calculateAndDisplayTotals);
     Object.values(inputs).forEach(input => {
-        if (input.id !== 'sheet-selector') { // Don't need live updates for the dropdown
-             input.addEventListener('input', updatePreview);
+        if (!['billingMethod', 'hourlyRate', 'fixedRate'].includes(input.id)) {
+            input.addEventListener('input', updatePreview);
         }
     });
-
-    // Add listeners to buttons
     buttons.fetchData.addEventListener('click', fetchAndDisplayData);
     buttons.generatePdf.addEventListener('click', generatePdf);
-
-    // Initial calls on page load
     updatePreview();
-    populateSheetDropdown(); // Call the new function to fill the dropdown
+    populateSheetDropdown();
+    handleBillingMethodChange();
 });
