@@ -213,6 +213,7 @@ function generatePdf() {
     });
     buttons.fetchData.addEventListener('click', fetchAndDisplayData);
     buttons.generatePdf.addEventListener('click', generatePdf);
+        loadDefaults(); // <-- THIS IS THE MOST IMPORTANT NEW LINE
     updatePreview();
     populateSheetDropdown();
     handleBillingMethodChange();
