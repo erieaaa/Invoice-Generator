@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creative Invoice Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Input Controls Section -->
+        <div class="controls-container">
+            <h2>Invoice Details</h2>
+            
+            <div class="control-group">
+                <h3>Bill To:</h3>
+                <input type="text" id="client-name" placeholder="Client Name / Department">
+                <input type="text" id="client-company" placeholder="Company Name">
+                <input type="email" id="client-email" placeholder="Email Address">
+            </div>
+
+            <div class="control-group">
+                <!-- NEW DROPDOWN ADDED HERE -->
+                <h3>Select Timesheet:</h3>
+                <select id="sheet-selector">
+                    <option value="">Loading sheets...</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <h3>Billing Period:</h3>
+                <div class="date-range">
+                    <label for="start-date">From:</label>
+                    <input type="date" id="start-date">
+                    <label for="end-date">To:</label>
+                    <input type="date" id="end-date">
+                </div>
+                <button id="fetch-data-btn">Get Timesheet Data</button>
+            </div>
+
+            <div class="control-group">
+                <h3>Payment Info:</h3>
+                <input type="text" id="payment-method" placeholder="Payment Method (e.g., PayPal, Bank Transfer)">
+                <textarea id="payment-details" placeholder="Your Payment Details (e.g., PayPal email, Bank Account Info)"></textarea>
+            </div>
+
+            <button id="generate-pdf-btn" class="cta-button">Generate & Download PDF</button>
+        </div>
+
+        <!-- Live Invoice Preview Section (No changes here) -->
+        <div class="invoice-container">
+            <div id="invoice-preview">
+                <header class="invoice-header">
+                    <div class="logo-container">
+                        <h1>Erika Mae M. Guido</h1>
+                        <p>guidoerikam@gmail.com | 0912-036-7038</p>
+                    </div>
+                    <div class="invoice-title">
+                        <h1>INVOICE</h1>
+                        <p><strong>Invoice ID:</strong> <span id="preview-invoice-id"></span></p>
+                    </div>
+                </header>
+                <section class="billing-details">
+                    <div class="bill-to">
+                        <h4>BILL TO</h4>
+                        <p id="preview-client-name">Client Name</p>
+                        <p id="preview-client-company">Company Name</p>
+                        <p id="preview-client-email">Email Address</p>
+                    </div>
+                    <div class="invoice-meta">
+                        <p><strong>Invoice Date:</strong> <span id="preview-invoice-date"></span></p>
+                        <p><strong>Billing Period:</strong> <span id="preview-billing-period"></span></p>
+                    </div>
+                </section>
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th class="task-col">Tasks</th>
+                            <th>Duration (Hours)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invoice-body"></tbody>
+                </table>
+                <footer class="invoice-footer">
+                    <div class="payment-info">
+                        <h4>Payment Details</h4>
+                        <p><strong>Method:</strong> <span id="preview-payment-method"></span></p>
+                        <pre id="preview-payment-details"></pre>
+                    </div>
+                    <div class="total-section">
+                        <p>Total Hours</p>
+                        <h2 id="total-hours">0.00</h2>
+                    </div>
+                </footer>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
