@@ -172,3 +172,24 @@ pre { font-family: 'Poppins', sans-serif; margin: 5px 0 0; white-space: pre-wrap
 .invoice-footer {
     page-break-inside: avoid; /* This is the magic rule! */
 }
+
+.default-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.util-button, .util-button-secondary {
+    flex: 1;
+    font-size: 12px;
+    padding: 0.5rem;
+    font-weight: 500;
+}
+
+.util-button {
+    background-color: #28a745; /* Green for save */
+}
+
+.util-button-secondary {
+    background-color: #6c757d; /* Gray for clear */
+}
