@@ -17,13 +17,14 @@ body {
 
 .app-container {
     display: flex;
+    flex-wrap: wrap;
     padding: 2rem;
     gap: 2rem;
 }
 
-/* Controls (Left Side) */
 .controls-container {
     flex: 1;
+    min-width: 350px;
     background: var(--white-color);
     padding: 2rem;
     border-radius: 12px;
@@ -38,16 +39,10 @@ body {
     padding-bottom: 0.5rem;
 }
 
-.control-group {
-    margin-bottom: 1.5rem;
-}
+.control-group { margin-bottom: 1.5rem; }
+.control-group h3 { margin-bottom: 0.75rem; font-weight: 600; }
 
-.control-group h3 {
-    margin-bottom: 0.75rem;
-    font-weight: 600;
-}
-
-input[type="text"], input[type="email"], input[type="date"], textarea {
+input[type="text"], input[type="email"], input[type="date"], input[type="number"], textarea, select {
     width: 100%;
     padding: 0.75rem;
     border: 1px solid var(--border-color);
@@ -59,22 +54,14 @@ input[type="text"], input[type="email"], input[type="date"], textarea {
     transition: border-color 0.3s, box-shadow 0.3s;
 }
 
-input:focus, textarea:focus {
+input:focus, textarea:focus, select:focus {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 5px rgba(74, 144, 226, 0.3);
 }
 
-textarea {
-    min-height: 100px;
-    resize: vertical;
-}
-
-.date-range {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
+textarea { min-height: 100px; resize: vertical; }
+.date-range { display: flex; align-items: center; gap: 0.5rem; }
 
 button {
     background: #6c757d;
@@ -89,108 +76,99 @@ button {
     margin-top: 0.5rem;
 }
 
-button:hover {
-    transform: translateY(-2px);
-}
+button:hover { transform: translateY(-2px); }
 
 .cta-button {
     background: linear-gradient(45deg, var(--primary-color), #357ABD);
     font-size: 16px;
 }
+.cta-button:hover { background: linear-gradient(45deg, #357ABD, var(--primary-color)); }
 
-.cta-button:hover {
-    background: linear-gradient(45deg, #357ABD, var(--primary-color));
+select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%2... (shortened for brevity)');
+    background-repeat: no-repeat;
+    background-position: right .7em top 50%;
+    background-size: .65em auto;
 }
 
-/* Invoice Preview (Right Side) */
-.invoice-container {
-    flex: 2;
+.invoice-container { flex: 2; min-width: 400px; }
+#invoice-preview { 
+    background: var(--white-color); 
+    padding: 3rem; 
+    border-radius: 8px; 
+    box-shadow: 0 10px 30px rgba(0,0,0,0.07); 
+    min-height: 800px; 
+    
+    /* --- ADD THESE TWO LINES --- */
+    max-width: 800px; /* Constrains the width to prevent layout bugs */
+    box-sizing: border-box; /* Ensures padding is included in the width */
 }
-
-#invoice-preview {
-    background: var(--white-color);
-    padding: 3rem;
-    border-radius: 8px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.07);
-    min-height: 800px;
-}
-
-.invoice-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    border-bottom: 3px solid var(--primary-color);
-    padding-bottom: 1rem;
-}
-
+.invoice-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid var(--primary-color); padding-bottom: 1rem; }
 .logo-container h1 { margin: 0; }
 .logo-container p { margin: 5px 0 0; font-size: 12px; }
 .invoice-title { text-align: right; }
 .invoice-title h1 { margin: 0; color: var(--primary-color); font-size: 3em; }
 .invoice-title p { margin: 5px 0 0; }
-
-.billing-details {
-    display: flex;
-    justify-content: space-between;
-    margin: 2rem 0;
-}
-.bill-to h4, .invoice-meta h4 {
-    margin-top: 0;
-    font-size: 12px;
-    color: #999;
-    letter-spacing: 1px;
-}
+.billing-details { display: flex; justify-content: space-between; margin: 2rem 0; }
+.bill-to h4 { margin-top: 0; font-size: 12px; color: #999; letter-spacing: 1px; }
 .bill-to p, .invoice-meta p { margin: 5px 0; }
 .invoice-meta { text-align: right; }
-
 .items-table {
     width: 100%;
     border-collapse: collapse;
     margin-bottom: 2rem;
+    table-layout: fixed; /* This is critical for PDF rendering */
 }
+
 .items-table th, .items-table td {
     padding: 0.8rem;
     text-align: left;
+    overflow-wrap: break-word; /* Ensures long text wraps correctly */
+    word-wrap: break-word;
 }
+
 .items-table thead {
     background-color: var(--primary-color);
     color: var(--white-color);
 }
+
 .items-table tbody tr:nth-child(even) {
     background-color: var(--bg-color);
 }
-.items-table .task-col { width: 60%; }
 
-.invoice-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    margin-top: 3rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--border-color);
-}
+/* Updated Column Widths */
+.items-table .date-col { width: 15%; }
+.items-table .task-col { width: 55%; }
+.items-table .time-col { width: 10%; }
+.invoice-footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
 .payment-info h4 { margin: 0 0 0.5rem 0; }
 .payment-info p { margin: 0; }
-pre { font-family: 'Poppins', sans-serif; margin: 5px 0 0; white-space: pre-wrap; word-wrap: break-word;}
+pre { font-family: 'Poppins', sans-serif; margin: 5px 0 0; white-space: pre-wrap; }
 .total-section { text-align: right; }
 .total-section p { margin: 0; font-size: 16px; }
 .total-section h2 { margin: 5px 0 0; font-size: 2.5em; color: var(--primary-color); }
 
-select {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    font-family: 'Poppins', sans-serif;
-    font-size: 14px;
-    box-sizing: border-box;
-    margin-bottom: 0.5rem;
-    background-color: white;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%234A90E2%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-13%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2013l128%20127.9c3.6%203.6%207.8%205.4%2013%205.4s9.4-1.8%2013-5.4L287%2095.2c3.6-3.6%205.4-7.8%205.4-13%200-5-1.8-9.4-5.4-13z%22%2F%3E%3C%2Fsvg%3E');
-    background-repeat: no-repeat;
-    background-position: right .7em top 50%;
-    background-size: .65em auto;
+.total-amount-label {
+    margin-top: 1.5rem;
+    font-weight: 600;
+}
+
+.total-amount-value {
+    color: #4CAF50;
+    font-size: 2.8em;
+}
+
+.hidden {
+    display: none;
+}
+
+.billing-method-inputs {
+    margin-top: 1rem;
+}
+
+.invoice-footer {
+    page-break-inside: avoid; /* This is the magic rule! */
 }
