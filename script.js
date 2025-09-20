@@ -1,8 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     // --- CONFIGURATION ---
     const SPREADSHEET_ID = '1-54sXsMbJmZlm-ecaNRjP9weSf9sBBBWs2XA0CGNhgg';
-    const API_KEY = 'AIzaSyDC19jZi4kwBD-3Pr0bFIdESTw5FrAZO8M'; // IMPORTANT: Replace with your actual API key
-
     // --- GLOBAL STATE ---
     let totalMinutes = 0;
 
@@ -261,3 +259,4 @@ document.addEventListener('DOMContentLoaded', function() {
     populateSheetDropdown();
     handleBillingMethodChange(); // Set the correct billing view
 });
+
