@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     // --- CONFIGURATION ---
     const SPREADSHEET_ID = '1-54sXsMbJmZlm-ecaNRjP9weSf9sBBBWs2XA0CGNhgg';
-    const API_KEY = 'AIzaSyDC19jZi4kwBD-3Pr0bFIdESTw5FrAZO8M';
+    const API_KEY = 'AIzaSyDC19jZi4kwBD-3Pr0bFIdESTw5FrAZO8M'; // IMPORTANT: Replace with your actual API key
 
     // --- GLOBAL STATE ---
     let totalMinutes = 0;
@@ -41,23 +41,64 @@ document.addEventListener('DOMContentLoaded', function() {
     const buttons = {
         fetchData: document.getElementById('fetch-data-btn'),
         generatePdf: document.getElementById('generate-pdf-btn'),
+        // --- NEW BUTTONS ADDED ---
+        saveDefaults: document.getElementById('save-defaults-btn'),
+        clearDefaults: document.getElementById('clear-defaults-btn'),
     };
 
-    // NEW HELPER FUNCTION TO NORMALIZE TIME FORMAT
+    // --- NEW: DEFAULTS FUNCTIONS ---
+    // Function to save the current client and payment info to localStorage
+    function saveDefaults() {
+        const defaults = {
+            clientName: inputs.clientName.value,
+            clientCompany: inputs.clientCompany.value,
+            clientEmail: inputs.clientEmail.value,
+            paymentMethod: inputs.paymentMethod.value,
+            paymentDetails: inputs.paymentDetails.value,
+            billingMethod: inputs.billingMethod.value,
+            hourlyRate: inputs.hourlyRate.value,
+        };
+        localStorage.setItem('invoiceDefaults', JSON.stringify(defaults));
+        alert('Default client and payment info saved!');
+    }
+
+    // Function to clear the saved defaults from localStorage
+    function clearDefaults() {
+        localStorage.removeItem('invoiceDefaults');
+        alert('Default info cleared!');
+    }
+
+    // Function to load the saved defaults from localStorage into the form
+    function loadDefaults() {
+        const savedDefaults = localStorage.getItem('invoiceDefaults');
+        if (savedDefaults) {
+            const defaults = JSON.parse(savedDefaults);
+            inputs.clientName.value = defaults.clientName || '';
+            inputs.clientCompany.value = defaults.clientCompany || '';
+            inputs.clientEmail.value = defaults.clientEmail || '';
+            inputs.paymentMethod.value = defaults.paymentMethod || '';
+            inputs.paymentDetails.value = defaults.paymentDetails || '';
+            inputs.billingMethod.value = defaults.billingMethod || 'hourly';
+            inputs.hourlyRate.value = defaults.hourlyRate || '5.00';
+        }
+    }
+    // --- END OF NEW FUNCTIONS ---
+
+
+    // Helper function to normalize time format
     function formatTime(timeString) {
         if (!timeString || timeString.toUpperCase().includes('AM') || timeString.toUpperCase().includes('PM')) {
-            return timeString; // Already in a 12-hour format or empty
+            return timeString;
         }
-
         try {
             let [hours, minutes] = timeString.split(':').map(Number);
             const ampm = hours >= 12 ? 'PM' : 'AM';
             hours = hours % 12;
-            hours = hours ? hours : 12; // the hour '0' should be '12'
+            hours = hours ? hours : 12;
             const minutesStr = String(minutes).padStart(2, '0');
             return `${hours}:${minutesStr} ${ampm}`;
         } catch (e) {
-            return timeString; // If parsing fails, return original string
+            return timeString;
         }
     }
 
@@ -76,7 +117,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function calculateAndDisplayTotals() {
         const method = inputs.billingMethod.value;
         let totalAmount = 0;
-
         if (method === 'hourly') {
             const hourlyRate = parseFloat(inputs.hourlyRate.value) || 0;
             const totalDecimalHours = totalMinutes / 60;
@@ -108,7 +148,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function generateInvoiceId() { return `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`; }
+    function generateInvoiceId() {
+        return `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
 
     function updatePreview() {
         previews.clientName.textContent = inputs.clientName.value || 'Client Name';
@@ -121,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
         previews.billingPeriod.textContent = `${start} – ${end}`;
     }
 
- async function fetchAndDisplayData() {
+    async function fetchAndDisplayData() {
         totalMinutes = 0;
         previews.invoiceBody.innerHTML = '';
         const selectedSheet = inputs.sheetSelector.value;
@@ -148,11 +190,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     filteredRows.forEach(row => {
                         const [, date, rawTimeFrom, rawTimeTo, durationStr, tasks] = row;
-                        
-                        // THIS IS THE UPDATED SECTION
-                        const timeFrom = formatTime(rawTimeFrom || ''); // Format the time
-                        const timeTo = formatTime(rawTimeTo || '');     // Format the time
-
+                        const timeFrom = formatTime(rawTimeFrom || '');
+                        const timeTo = formatTime(rawTimeTo || '');
                         const [hours, minutes] = (durationStr || '0:0').split(':').map(Number);
                         totalMinutes += (hours || 0) * 60 + (minutes || 0);
                         const tr = document.createElement('tr');
@@ -177,44 +216,48 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-function generatePdf() {
-    // THIS IS THE NEW LINE THAT FIXES THE TOP MARGIN
-    window.scrollTo(0, 0);
-
-    const invoiceElement = document.getElementById('invoice-preview');
-    const clientName = inputs.clientCompany.value || 'Invoice';
-    const invoiceId = previews.invoiceId.textContent;
-
-    const opt = {
-        margin:       [0.5, 0.25, 0.5, 0.25],
-        filename:     `${clientName}_${invoiceId}.pdf`,
-        pagebreak:    { mode: 'css', avoid: ['thead', 'tr', '.invoice-footer'] },
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  {
-            scale: 2,
-            useCORS: true
-        },
-        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-
-    html2pdf().from(invoiceElement).set(opt).save();
-}
+    function generatePdf() {
+        window.scrollTo(0, 0);
+        const invoiceElement = document.getElementById('invoice-preview');
+        const clientName = inputs.clientCompany.value || 'Invoice';
+        const invoiceId = previews.invoiceId.textContent;
+        const opt = {
+            margin: [0.5, 0.25, 0.5, 0.25],
+            filename: `${clientName}_${invoiceId}.pdf`,
+            pagebreak: { mode: 'css', avoid: ['thead', 'tr', '.invoice-footer'] },
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+        html2pdf().from(invoiceElement).set(opt).save();
+    }
 
     // --- INITIALIZATION & EVENT LISTENERS ---
     previews.invoiceId.textContent = generateInvoiceId();
     previews.invoiceDate.textContent = new Date().toLocaleDateString();
+    
+    // Listen for changes
     inputs.billingMethod.addEventListener('change', handleBillingMethodChange);
     inputs.hourlyRate.addEventListener('input', calculateAndDisplayTotals);
     inputs.fixedRate.addEventListener('input', calculateAndDisplayTotals);
+    
+    // Update preview on any input
     Object.values(inputs).forEach(input => {
         if (!['billingMethod', 'hourlyRate', 'fixedRate'].includes(input.id)) {
             input.addEventListener('input', updatePreview);
         }
     });
+    
+    // Listen for button clicks
     buttons.fetchData.addEventListener('click', fetchAndDisplayData);
     buttons.generatePdf.addEventListener('click', generatePdf);
-        loadDefaults(); // <-- THIS IS THE MOST IMPORTANT NEW LINE
-    updatePreview();
+    // --- NEW EVENT LISTENERS ---
+    buttons.saveDefaults.addEventListener('click', saveDefaults);
+    buttons.clearDefaults.addEventListener('click', clearDefaults);
+    
+    // --- FINAL SETUP ---
+    loadDefaults(); // Now this function exists and will run without error.
+    updatePreview(); // Update preview with any loaded defaults
     populateSheetDropdown();
-    handleBillingMethodChange();
+    handleBillingMethodChange(); // Set the correct billing view
 });
