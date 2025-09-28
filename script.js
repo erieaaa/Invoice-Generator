@@ -182,7 +182,7 @@ document.addEventListener('DOMContentLoaded', function() {
         previews.clientEmail.textContent = inputs.clientEmail.value || 'Email Address';
         previews.paymentMethod.textContent = inputs.paymentMethod.value || 'N/A';
         previews.paymentDetails.textContent = inputs.paymentDetails.value || 'N/A';
-        const start = inputs.startDate.value ? new Date(inputs.startDate.value).toLocaleDateDateString() : '...';
+        const start = inputs.startDate.value ? new Date(inputs.startDate.value).toLocaleDateString() : '...';
         const end = inputs.endDate.value ? new Date(inputs.endDate.value).toLocaleDateString() : '...';
         previews.billingPeriod.textContent = `${start} – ${end}`;
     }
@@ -195,6 +195,11 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Please select a timesheet and a valid date range.');
             return;
         }
+
+        // --- THIS IS THE FIX ---
+        // Update the preview to show the selected dates before fetching data.
+        updatePreview();
+
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/'${encodeURIComponent(selectedSheet)}'!A:G?key=${API_KEY}`;
         try {
             const response = await fetch(url);
