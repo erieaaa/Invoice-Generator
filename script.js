@@ -1,6 +1,8 @@
 document.addEventListener('DOMContentLoaded', function() {
     // --- CONFIGURATION ---
     const SPREADSHEET_ID = '1-54sXsMbJmZlm-ecaNRjP9weSf9sBBBWs2XA0CGNhgg';
+    const API_KEY = 'AIzaSyDC19jZi4kwBD-3Pr0bFIdESTw5FrAZO8M'; // IMPORTANT: Replace with your actual API key
+
     // --- GLOBAL STATE ---
     let totalMinutes = 0;
 
@@ -33,19 +35,22 @@ document.addEventListener('DOMContentLoaded', function() {
         paymentDetails: document.getElementById('preview-payment-details'),
         invoiceBody: document.getElementById('invoice-body'),
         totalHours: document.getElementById('total-hours'),
+        // --- NEW PREVIEW ELEMENTS FOR FEE CALCULATION ---
+        subtotalContainer: document.getElementById('subtotal-container'),
+        feeContainer: document.getElementById('fee-container'),
+        subtotal: document.getElementById('preview-subtotal'),
+        fee: document.getElementById('preview-fee'),
         totalAmount: document.getElementById('total-amount'),
         totalAmountLabel: document.getElementById('total-amount-label'),
     };
     const buttons = {
         fetchData: document.getElementById('fetch-data-btn'),
         generatePdf: document.getElementById('generate-pdf-btn'),
-        // --- NEW BUTTONS ADDED ---
         saveDefaults: document.getElementById('save-defaults-btn'),
         clearDefaults: document.getElementById('clear-defaults-btn'),
     };
 
-    // --- NEW: DEFAULTS FUNCTIONS ---
-    // Function to save the current client and payment info to localStorage
+    // --- DEFAULTS FUNCTIONS ---
     function saveDefaults() {
         const defaults = {
             clientName: inputs.clientName.value,
@@ -60,13 +65,11 @@ document.addEventListener('DOMContentLoaded', function() {
         alert('Default client and payment info saved!');
     }
 
-    // Function to clear the saved defaults from localStorage
     function clearDefaults() {
         localStorage.removeItem('invoiceDefaults');
         alert('Default info cleared!');
     }
 
-    // Function to load the saved defaults from localStorage into the form
     function loadDefaults() {
         const savedDefaults = localStorage.getItem('invoiceDefaults');
         if (savedDefaults) {
@@ -80,8 +83,6 @@ document.addEventListener('DOMContentLoaded', function() {
             inputs.hourlyRate.value = defaults.hourlyRate || '5.00';
         }
     }
-    // --- END OF NEW FUNCTIONS ---
-
 
     // Helper function to normalize time format
     function formatTime(timeString) {
@@ -112,18 +113,43 @@ document.addEventListener('DOMContentLoaded', function() {
         calculateAndDisplayTotals();
     }
 
+    // --- UPDATED FUNCTION TO HANDLE PAYONEER FEE ---
     function calculateAndDisplayTotals() {
         const method = inputs.billingMethod.value;
-        let totalAmount = 0;
+        const paymentMethod = inputs.paymentMethod.value;
+        let subtotal = 0;
+
+        // 1. Calculate the base amount (subtotal)
         if (method === 'hourly') {
             const hourlyRate = parseFloat(inputs.hourlyRate.value) || 0;
             const totalDecimalHours = totalMinutes / 60;
-            totalAmount = totalDecimalHours * hourlyRate;
-            previews.totalAmountLabel.textContent = 'Total Amount';
+            subtotal = totalDecimalHours * hourlyRate;
         } else {
-            totalAmount = parseFloat(inputs.fixedRate.value) || 0;
-            previews.totalAmountLabel.textContent = 'Fixed Project Total';
+            subtotal = parseFloat(inputs.fixedRate.value) || 0;
         }
+
+        let fee = 0;
+        let totalAmount = subtotal;
+        
+        // 2. Check for Payoneer and add a 2% fee if applicable
+        if (paymentMethod.toLowerCase().trim() === 'payoneer' && subtotal > 0) {
+            fee = subtotal * 0.02;
+            totalAmount = subtotal + fee;
+
+            // Update the preview and show the fee containers
+            previews.subtotal.textContent = `$${subtotal.toFixed(2)}`;
+            previews.fee.textContent = `$${fee.toFixed(2)}`;
+            previews.subtotalContainer.classList.remove('hidden');
+            previews.feeContainer.classList.remove('hidden');
+            previews.totalAmountLabel.textContent = 'Grand Total';
+        } else {
+            // Hide the fee containers if not applicable
+            previews.subtotalContainer.classList.add('hidden');
+            previews.feeContainer.classList.add('hidden');
+            previews.totalAmountLabel.textContent = method === 'fixed' ? 'Fixed Project Total' : 'Total Amount';
+        }
+
+        // 3. Display the final total
         previews.totalAmount.textContent = `$${totalAmount.toFixed(2)}`;
     }
 
@@ -156,7 +182,7 @@ document.addEventListener('DOMContentLoaded', function() {
         previews.clientEmail.textContent = inputs.clientEmail.value || 'Email Address';
         previews.paymentMethod.textContent = inputs.paymentMethod.value || 'N/A';
         previews.paymentDetails.textContent = inputs.paymentDetails.value || 'N/A';
-        const start = inputs.startDate.value ? new Date(inputs.startDate.value).toLocaleDateString() : '...';
+        const start = inputs.startDate.value ? new Date(inputs.startDate.value).toLocaleDateDateString() : '...';
         const end = inputs.endDate.value ? new Date(inputs.endDate.value).toLocaleDateString() : '...';
         previews.billingPeriod.textContent = `${start} – ${end}`;
     }
@@ -236,12 +262,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Listen for changes
     inputs.billingMethod.addEventListener('change', handleBillingMethodChange);
+    // --- NEW: Recalculate if payment method changes ---
+    inputs.paymentMethod.addEventListener('input', calculateAndDisplayTotals);
     inputs.hourlyRate.addEventListener('input', calculateAndDisplayTotals);
     inputs.fixedRate.addEventListener('input', calculateAndDisplayTotals);
     
     // Update preview on any input
     Object.values(inputs).forEach(input => {
-        if (!['billingMethod', 'hourlyRate', 'fixedRate'].includes(input.id)) {
+        if (!['billingMethod', 'hourlyRate', 'fixedRate', 'paymentMethod'].includes(input.id)) {
             input.addEventListener('input', updatePreview);
         }
     });
@@ -249,14 +277,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Listen for button clicks
     buttons.fetchData.addEventListener('click', fetchAndDisplayData);
     buttons.generatePdf.addEventListener('click', generatePdf);
-    // --- NEW EVENT LISTENERS ---
     buttons.saveDefaults.addEventListener('click', saveDefaults);
     buttons.clearDefaults.addEventListener('click', clearDefaults);
     
     // --- FINAL SETUP ---
-    loadDefaults(); // Now this function exists and will run without error.
-    updatePreview(); // Update preview with any loaded defaults
+    loadDefaults(); 
+    updatePreview(); 
     populateSheetDropdown();
-    handleBillingMethodChange(); // Set the correct billing view
+    handleBillingMethodChange();
 });
-
