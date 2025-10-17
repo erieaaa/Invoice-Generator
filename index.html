@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Creative Invoice Generator</title>
+    <title>Hybrid Invoice Generator</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -12,7 +12,7 @@
     <!-- PDF Generation Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     
-    <!-- NEW: File Parsing Libraries -->
+    <!-- File Parsing Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -34,9 +34,18 @@
                 </div>
             </div>
 
-            <!-- REPLACED Google Sheet section with File Upload -->
-            <div class="control-group">
-                <h3>Upload Timesheet:</h3>
+            <!-- COMBINED DATA SOURCE SECTION -->
+            <div class="control-group data-source">
+                <h3>Data Source (Choose One)</h3>
+                
+                <h4>Option 1: Paste Google Sheet Link</h4>
+                <input type="text" id="spreadsheet-id" placeholder="Paste Google Sheet ID or URL">
+                <button id="load-sheets-btn">Load Sheet Tabs</button>
+                <select id="sheet-selector" style="margin-top: 0.5rem;">
+                    <option value="">Load a sheet to see tabs</option>
+                </select>
+
+                <h4>Option 2: Upload File</h4>
                 <input type="file" id="file-uploader" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
             </div>
             
@@ -48,7 +57,7 @@
                     <label for="end-date">To:</label>
                     <input type="date" id="end-date">
                 </div>
-                <!-- REMOVED "Get Timesheet Data" button as it's now automatic on upload -->
+                <button id="fetch-data-btn">Generate from Source</button>
             </div>
 
             <div class="control-group">
@@ -113,7 +122,7 @@
                         </tr>
                     </thead>
                     <tbody id="invoice-body">
-                        <tr><td colspan="5" style="text-align: center;">Please select a date range and upload your timesheet.</td></tr>
+                        <tr><td colspan="5" style="text-align: center;">Please provide a data source and select a billing period.</td></tr>
                     </tbody>
                 </table>
                 <footer class="invoice-footer">
