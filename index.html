@@ -27,12 +27,21 @@
                     <button id="clear-defaults-btn" class="util-button-secondary">Clear Default</button>
                 </div>
             </div>
+
+            <!-- NEW: Section for specifying the Google Sheet -->
             <div class="control-group">
-                <h3>Select Timesheet:</h3>
+                <h3>Google Sheet Source:</h3>
+                <input type="text" id="spreadsheet-id" placeholder="Paste Google Sheet ID or URL here">
+                <button id="load-sheets-btn">Load Sheet Tabs</button>
+            </div>
+            
+            <div class="control-group">
+                <h3>Select Timesheet Tab:</h3>
                 <select id="sheet-selector">
-                    <option value="">Loading sheets...</option>
+                    <option value="">Enter Sheet ID and click Load</option>
                 </select>
             </div>
+            
             <div class="control-group">
                 <h3>Billing Period:</h3>
                 <div class="date-range">
@@ -117,7 +126,6 @@
                         <p>Total Hours</p>
                         <h2 id="total-hours">00:00</h2>
                         
-                        <!-- NEW: SUBTOTAL AND FEE ELEMENTS (HIDDEN BY DEFAULT) -->
                         <div id="subtotal-container" class="hidden">
                             <p class="total-amount-label">Subtotal</p>
                             <h2 id="preview-subtotal" class="total-amount-value">$0.00</h2>
