@@ -102,6 +102,20 @@ document.addEventListener('DOMContentLoaded', function() {
             return timeString;
         }
     }
+    
+    // NEW HELPER FUNCTION TO PARSE DURATION (handles "2:30" and "2.5")
+    function parseDurationToMinutes(durationStr) {
+        if (!durationStr) return 0;
+        durationStr = String(durationStr).trim();
+
+        if (durationStr.includes(':')) {
+            const [hours, minutes] = durationStr.split(':').map(Number);
+            return (hours || 0) * 60 + (minutes || 0);
+        } else {
+            const decimalHours = parseFloat(durationStr);
+            return isNaN(decimalHours) ? 0 : decimalHours * 60;
+        }
+    }
 
     function handleBillingMethodChange() {
         const selectedMethod = inputs.billingMethod.value;
@@ -202,15 +216,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectedSheet = inputs.sheetSelector.value;
         const spreadsheetId = inputs.spreadsheetId.value.trim();
 
-        if (!spreadsheetId) {
-            alert('The Google Sheet ID is missing.');
-            return;
-        }
-        if (!selectedSheet || !inputs.startDate.value || !inputs.endDate.value) {
-            alert('Please select a timesheet tab and a valid date range.');
-            return;
-        }
+        // --- Reset UI: Show all columns by default ---
+        document.getElementById('from-th').style.display = 'table-cell';
+        document.getElementById('to-th').style.display = 'table-cell';
 
+        if (!spreadsheetId || !selectedSheet || !inputs.startDate.value || !inputs.endDate.value) {
+            alert('Please provide a Sheet ID, select a tab, and set a date range.');
+            return;
+        }
         updatePreview();
         
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${encodeURIComponent(selectedSheet)}'?key=${API_KEY}`;
@@ -229,62 +242,75 @@ document.addEventListener('DOMContentLoaded', function() {
             headerRow.forEach((header, index) => {
                 headerMap[header.trim().toLowerCase()] = index;
             });
-
-            const requiredHeaders = ['date', 'tasks', 'from', 'to', 'duration'];
-            const missingHeaders = requiredHeaders.filter(h => headerMap[h] === undefined);
-
-            if (missingHeaders.length > 0) {
-                alert(`Error: Your sheet is missing the following required columns: ${missingHeaders.join(', ')}`);
-                return;
-            }
             
             const dataRows = data.values.slice(1);
-            
-            // --- ========================================================= ---
-            // --- THIS IS THE FIX FOR THE DATE RANGE PROBLEM ---
-            // --- ========================================================= ---
             const startDate = new Date(inputs.startDate.value);
-            startDate.setHours(0, 0, 0, 0); // Set to the beginning of the start day
-
+            startDate.setHours(0, 0, 0, 0);
             const endDate = new Date(inputs.endDate.value);
-            endDate.setHours(23, 59, 59, 999); // Set to the end of the end day
+            endDate.setHours(23, 59, 59, 999);
             
             const filteredRows = dataRows.filter(row => {
                 const dateStr = row[headerMap.date];
                 if (!dateStr) return false;
                 const rowDate = new Date(dateStr);
-                // Use the adjusted start and end dates for comparison
                 return !isNaN(rowDate) && startDate <= rowDate && rowDate <= endDate;
             });
-            // --- END OF FIX ---
 
             if (filteredRows.length === 0) {
                 previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No entries found for the selected period.</td></tr>';
-            } else {
+                return;
+            }
+
+            // --- LAYOUT DETECTION LOGIC ---
+            const isDetailedLayout = headerMap.from !== undefined && headerMap.to !== undefined;
+            const isSimpleLayout = headerMap.duration !== undefined;
+
+            if (isDetailedLayout) {
+                // --- Process DETAILED layout (with From/To) ---
                 filteredRows.forEach(row => {
                     const date = row[headerMap.date];
                     const tasks = row[headerMap.tasks] || '';
-                    const rawTimeFrom = row[headerMap.from] || '';
-                    const rawTimeTo = row[headerMap.to] || '';
                     const durationStr = row[headerMap.duration] || '0:0';
-                    
-                    const timeFrom = formatTime(rawTimeFrom);
-                    const timeTo = formatTime(rawTimeTo);
-                    const [hours, minutes] = durationStr.split(':').map(Number);
-                    totalMinutes += (hours || 0) * 60 + (minutes || 0);
+                    totalMinutes += parseDurationToMinutes(durationStr);
                     
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>${new Date(date).toLocaleDateString()}</td>
                         <td>${tasks}</td>
-                        <td>${timeFrom}</td>
-                        <td>${timeTo}</td>
+                        <td>${formatTime(row[headerMap.from] || '')}</td>
+                        <td>${formatTime(row[headerMap.to] || '')}</td>
                         <td>${durationStr}</td>
                     `;
                     previews.invoiceBody.appendChild(tr);
                 });
+
+            } else if (isSimpleLayout) {
+                // --- Process SIMPLE layout (Duration only) ---
+                document.getElementById('from-th').style.display = 'none'; // Hide From column
+                document.getElementById('to-th').style.display = 'none';   // Hide To column
+
+                filteredRows.forEach(row => {
+                    const date = row[headerMap.date];
+                    const tasks = row[headerMap.tasks] || '';
+                    const durationStr = row[headerMap.duration] || '0';
+                    totalMinutes += parseDurationToMinutes(durationStr);
+                    
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${new Date(date).toLocaleDateString()}</td>
+                        <td>${tasks}</td>
+                        <td style="display: none;"></td> <!-- Hide From cell -->
+                        <td style="display: none;"></td> <!-- Hide To cell -->
+                        <td>${durationStr}</td>
+                    `;
+                    previews.invoiceBody.appendChild(tr);
+                });
+
+            } else {
+                alert('Sheet format not recognized. Please ensure your sheet has a header row with either ("date", "tasks", "from", "to", "duration") or ("date", "tasks", "duration").');
             }
 
+            // --- Final Calculations ---
             const totalHours = Math.floor(totalMinutes / 60);
             const remainingMinutes = totalMinutes % 60;
             previews.totalHours.textContent = `${String(totalHours).padStart(2, '0')}:${String(remainingMinutes).padStart(2, '0')}`;
