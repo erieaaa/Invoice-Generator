@@ -101,10 +101,8 @@ select {
     border-radius: 8px; 
     box-shadow: 0 10px 30px rgba(0,0,0,0.07); 
     min-height: 800px; 
-    
-    /* --- ADD THESE TWO LINES --- */
-    max-width: 800px; /* Constrains the width to prevent layout bugs */
-    box-sizing: border-box; /* Ensures padding is included in the width */
+    max-width: 800px;
+    box-sizing: border-box;
 }
 .invoice-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid var(--primary-color); padding-bottom: 1rem; }
 .logo-container h1 { margin: 0; }
@@ -120,13 +118,13 @@ select {
     width: 100%;
     border-collapse: collapse;
     margin-bottom: 2rem;
-    table-layout: fixed; /* This is critical for PDF rendering */
+    table-layout: fixed;
 }
 
 .items-table th, .items-table td {
     padding: 0.8rem;
     text-align: left;
-    overflow-wrap: break-word; /* Ensures long text wraps correctly */
+    overflow-wrap: break-word;
     word-wrap: break-word;
 }
 
@@ -139,11 +137,10 @@ select {
     background-color: var(--bg-color);
 }
 
-/* Updated Column Widths */
 .items-table .date-col { width: 15%; }
 .items-table .task-col { width: 55%; }
 .items-table .time-col { width: 10%; }
-.invoice-footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
+.invoice-footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); page-break-inside: avoid; }
 .payment-info h4 { margin: 0 0 0.5rem 0; }
 .payment-info p { margin: 0; }
 pre { font-family: 'Poppins', sans-serif; margin: 5px 0 0; white-space: pre-wrap; }
@@ -169,10 +166,6 @@ pre { font-family: 'Poppins', sans-serif; margin: 5px 0 0; white-space: pre-wrap
     margin-top: 1rem;
 }
 
-.invoice-footer {
-    page-break-inside: avoid; /* This is the magic rule! */
-}
-
 .default-buttons {
     display: flex;
     gap: 0.5rem;
@@ -187,9 +180,9 @@ pre { font-family: 'Poppins', sans-serif; margin: 5px 0 0; white-space: pre-wrap
 }
 
 .util-button {
-    background-color: #28a745; /* Green for save */
+    background-color: #28a745;
 }
 
 .util-button-secondary {
-    background-color: #6c757d; /* Gray for clear */
+    background-color: #6c757d;
 }
