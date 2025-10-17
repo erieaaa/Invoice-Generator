@@ -8,7 +8,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    
+    <!-- PDF Generation Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    
+    <!-- NEW: File Parsing Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -28,18 +34,10 @@
                 </div>
             </div>
 
-            <!-- NEW: Section for specifying the Google Sheet -->
+            <!-- REPLACED Google Sheet section with File Upload -->
             <div class="control-group">
-                <h3>Google Sheet Source:</h3>
-                <input type="text" id="spreadsheet-id" placeholder="Paste Google Sheet ID or URL here">
-                <button id="load-sheets-btn">Load Sheet Tabs</button>
-            </div>
-            
-            <div class="control-group">
-                <h3>Select Timesheet Tab:</h3>
-                <select id="sheet-selector">
-                    <option value="">Enter Sheet ID and click Load</option>
-                </select>
+                <h3>Upload Timesheet:</h3>
+                <input type="file" id="file-uploader" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
             </div>
             
             <div class="control-group">
@@ -50,8 +48,9 @@
                     <label for="end-date">To:</label>
                     <input type="date" id="end-date">
                 </div>
-                <button id="fetch-data-btn">Get Timesheet Data</button>
+                <!-- REMOVED "Get Timesheet Data" button as it's now automatic on upload -->
             </div>
+
             <div class="control-group">
                 <h3>Billing Method</h3>
                 <select id="billing-method">
@@ -69,6 +68,7 @@
                     </div>
                 </div>
             </div>
+
             <div class="control-group">
                 <h3>Payment Info:</h3>
                 <input type="text" id="payment-method" placeholder="Payment Method (e.g., Payoneer, PayPal)">
@@ -102,19 +102,18 @@
                         <p><strong>Billing Period:</strong> <span id="preview-billing-period"></span></p>
                     </div>
                 </section>
-<table class="items-table">
+                <table class="items-table">
                     <thead>
                         <tr>
                             <th class="date-col">Date</th>
                             <th class="task-col">Tasks</th>
-                            <!-- ADDED IDs TO THESE TWO COLUMNS -->
                             <th id="from-th" class="time-col">From</th>
                             <th id="to-th" class="time-col">To</th>
                             <th class="time-col">Duration</th>
                         </tr>
                     </thead>
                     <tbody id="invoice-body">
-                        <tr><td colspan="5" style="text-align: center;">Please fill out the form to generate the invoice.</td></tr>
+                        <tr><td colspan="5" style="text-align: center;">Please select a date range and upload your timesheet.</td></tr>
                     </tbody>
                 </table>
                 <footer class="invoice-footer">
@@ -146,4 +145,3 @@
     <script src="script.js"></script>
 </body>
 </html>
-
