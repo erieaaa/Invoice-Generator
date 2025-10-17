@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     // --- CONFIGURATION ---
-    const SPREADSHEET_ID = '1-54sXsMbJmZlm-ecaNRjP9weSf9sBBBWs2XA0CGNhgg';
-    const API_KEY = 'AIzaSyDC19jZi4kwBD-3Pr0bFIdESTw5FrAZO8M'; // IMPORTANT: Replace with your actual API key
+    // REMOVED: SPREADSHEET_ID is now dynamic
+    const API_KEY = 'AIzaSyDC19jZi4kwBD-3Pr0bFIdESTw5FrAZO8M'; // IMPORTANT! Replace with your actual Google Sheets API key
 
     // --- GLOBAL STATE ---
     let totalMinutes = 0;
@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
         clientName: document.getElementById('client-name'),
         clientCompany: document.getElementById('client-company'),
         clientEmail: document.getElementById('client-email'),
+        spreadsheetId: document.getElementById('spreadsheet-id'), // NEW
         sheetSelector: document.getElementById('sheet-selector'),
         startDate: document.getElementById('start-date'),
         endDate: document.getElementById('end-date'),
@@ -35,7 +36,6 @@ document.addEventListener('DOMContentLoaded', function() {
         paymentDetails: document.getElementById('preview-payment-details'),
         invoiceBody: document.getElementById('invoice-body'),
         totalHours: document.getElementById('total-hours'),
-        // --- NEW PREVIEW ELEMENTS FOR FEE CALCULATION ---
         subtotalContainer: document.getElementById('subtotal-container'),
         feeContainer: document.getElementById('fee-container'),
         subtotal: document.getElementById('preview-subtotal'),
@@ -44,13 +44,14 @@ document.addEventListener('DOMContentLoaded', function() {
         totalAmountLabel: document.getElementById('total-amount-label'),
     };
     const buttons = {
+        loadSheets: document.getElementById('load-sheets-btn'), // NEW
         fetchData: document.getElementById('fetch-data-btn'),
         generatePdf: document.getElementById('generate-pdf-btn'),
         saveDefaults: document.getElementById('save-defaults-btn'),
         clearDefaults: document.getElementById('clear-defaults-btn'),
     };
 
-    // --- DEFAULTS FUNCTIONS ---
+    // --- DEFAULTS FUNCTIONS (UPDATED) ---
     function saveDefaults() {
         const defaults = {
             clientName: inputs.clientName.value,
@@ -60,6 +61,7 @@ document.addEventListener('DOMContentLoaded', function() {
             paymentDetails: inputs.paymentDetails.value,
             billingMethod: inputs.billingMethod.value,
             hourlyRate: inputs.hourlyRate.value,
+            spreadsheetId: inputs.spreadsheetId.value, // NEW
         };
         localStorage.setItem('invoiceDefaults', JSON.stringify(defaults));
         alert('Default client and payment info saved!');
@@ -81,6 +83,7 @@ document.addEventListener('DOMContentLoaded', function() {
             inputs.paymentDetails.value = defaults.paymentDetails || '';
             inputs.billingMethod.value = defaults.billingMethod || 'hourly';
             inputs.hourlyRate.value = defaults.hourlyRate || '5.00';
+            inputs.spreadsheetId.value = defaults.spreadsheetId || ''; // NEW
         }
     }
 
@@ -113,13 +116,11 @@ document.addEventListener('DOMContentLoaded', function() {
         calculateAndDisplayTotals();
     }
 
-    // --- UPDATED FUNCTION TO HANDLE PAYONEER FEE ---
     function calculateAndDisplayTotals() {
         const method = inputs.billingMethod.value;
         const paymentMethod = inputs.paymentMethod.value;
         let subtotal = 0;
 
-        // 1. Calculate the base amount (subtotal)
         if (method === 'hourly') {
             const hourlyRate = parseFloat(inputs.hourlyRate.value) || 0;
             const totalDecimalHours = totalMinutes / 60;
@@ -131,33 +132,47 @@ document.addEventListener('DOMContentLoaded', function() {
         let fee = 0;
         let totalAmount = subtotal;
         
-        // 2. Check for Payoneer and add a 2% fee if applicable
         if (paymentMethod.toLowerCase().trim() === 'payoneer' && subtotal > 0) {
             fee = subtotal * 0.02;
             totalAmount = subtotal + fee;
-
-            // Update the preview and show the fee containers
             previews.subtotal.textContent = `$${subtotal.toFixed(2)}`;
             previews.fee.textContent = `$${fee.toFixed(2)}`;
             previews.subtotalContainer.classList.remove('hidden');
             previews.feeContainer.classList.remove('hidden');
             previews.totalAmountLabel.textContent = 'Grand Total';
         } else {
-            // Hide the fee containers if not applicable
             previews.subtotalContainer.classList.add('hidden');
             previews.feeContainer.classList.add('hidden');
             previews.totalAmountLabel.textContent = method === 'fixed' ? 'Fixed Project Total' : 'Total Amount';
         }
 
-        // 3. Display the final total
         previews.totalAmount.textContent = `$${totalAmount.toFixed(2)}`;
     }
 
+    // --- UPDATED: populateSheetDropdown now uses the input field ---
     async function populateSheetDropdown() {
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?key=${API_KEY}`;
+        let spreadsheetId = inputs.spreadsheetId.value.trim();
+
+        // Helper to extract ID from a full URL
+        if (spreadsheetId.includes('/d/')) {
+            const match = spreadsheetId.match(/\/d\/([a-zA-Z0-9-_]+)/);
+            if (match && match[1]) {
+                spreadsheetId = match[1];
+                inputs.spreadsheetId.value = spreadsheetId; // Clean up the input field
+            }
+        }
+
+        if (!spreadsheetId) {
+            alert('Please paste a valid Google Sheet ID or URL first.');
+            return;
+        }
+
+        inputs.sheetSelector.innerHTML = '<option value="">Loading tabs...</option>';
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?key=${API_KEY}`;
+        
         try {
             const response = await fetch(url);
-            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}. Check if the Sheet is public or if the API key is correct.`);
             const data = await response.json();
             inputs.sheetSelector.innerHTML = '';
             data.sheets.forEach(sheet => {
@@ -168,7 +183,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         } catch (error) {
             console.error('Error fetching sheet names:', error);
-            inputs.sheetSelector.innerHTML = '<option value="">Error loading sheets</option>';
+            alert(`Failed to load sheet tabs. ${error.message}`);
+            inputs.sheetSelector.innerHTML = '<option value="">Error loading tabs</option>';
         }
     }
 
@@ -186,21 +202,26 @@ document.addEventListener('DOMContentLoaded', function() {
         const end = inputs.endDate.value ? new Date(inputs.endDate.value).toLocaleDateString() : '...';
         previews.billingPeriod.textContent = `${start} – ${end}`;
     }
-
+    
+    // --- UPDATED: fetchAndDisplayData now uses the input field ---
     async function fetchAndDisplayData() {
         totalMinutes = 0;
         previews.invoiceBody.innerHTML = '';
         const selectedSheet = inputs.sheetSelector.value;
+        const spreadsheetId = inputs.spreadsheetId.value.trim(); // Get ID from input
+
+        if (!spreadsheetId) {
+            alert('The Google Sheet ID is missing.');
+            return;
+        }
         if (!selectedSheet || !inputs.startDate.value || !inputs.endDate.value) {
-            alert('Please select a timesheet and a valid date range.');
+            alert('Please select a timesheet tab and a valid date range.');
             return;
         }
 
-        // --- THIS IS THE FIX ---
-        // Update the preview to show the selected dates before fetching data.
         updatePreview();
 
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/'${encodeURIComponent(selectedSheet)}'!A:G?key=${API_KEY}`;
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${encodeURIComponent(selectedSheet)}'!A:G?key=${API_KEY}`;
         try {
             const response = await fetch(url);
             if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
@@ -267,7 +288,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Listen for changes
     inputs.billingMethod.addEventListener('change', handleBillingMethodChange);
-    // --- NEW: Recalculate if payment method changes ---
     inputs.paymentMethod.addEventListener('input', calculateAndDisplayTotals);
     inputs.hourlyRate.addEventListener('input', calculateAndDisplayTotals);
     inputs.fixedRate.addEventListener('input', calculateAndDisplayTotals);
@@ -280,6 +300,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Listen for button clicks
+    buttons.loadSheets.addEventListener('click', populateSheetDropdown); // NEW
     buttons.fetchData.addEventListener('click', fetchAndDisplayData);
     buttons.generatePdf.addEventListener('click', generatePdf);
     buttons.saveDefaults.addEventListener('click', saveDefaults);
@@ -288,6 +309,5 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- FINAL SETUP ---
     loadDefaults(); 
     updatePreview(); 
-    populateSheetDropdown();
     handleBillingMethodChange();
 });
