@@ -178,6 +178,24 @@ document.addEventListener('DOMContentLoaded', function() {
         previews.billingPeriod.textContent = `${start} – ${end}`;
     }
 
+    // --- NEW MASTER FUNCTION TO DECIDE WHICH SOURCE TO USE ---
+    function generateFromSource() {
+        // Priority 1: Check if a file has been selected in the uploader.
+        if (inputs.fileUploader.files.length > 0) {
+            // Data is already loaded in rawData by the 'change' event listener,
+            // so we just need to re-process it with the current date range.
+            processAndDisplayData();
+        } 
+        // Priority 2: Check for Google Sheet details.
+        else if (inputs.spreadsheetId.value && inputs.sheetSelector.value) {
+            fetchDataFromGoogleSheet();
+        } 
+        // Otherwise, no valid source has been provided.
+        else {
+            alert('Please either upload a file OR provide a Google Sheet link and select a tab.');
+        }
+    }
+
     // --- DATA SOURCE LOGIC (FILE UPLOAD) ---
     function handleFile(file) {
         if (!file) return;
@@ -306,7 +324,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const filteredRows = rawData.filter(row => {
             const dateStr = row[headerMap.date];
             if (!dateStr) return false;
-            // Handle Excel's integer date format and standard date strings
             const rowDate = typeof dateStr === 'number' ? new Date(Date.UTC(0, 0, dateStr - 1)) : new Date(dateStr);
             return !isNaN(rowDate) && startDate <= rowDate && rowDate <= endDate;
         });
@@ -388,10 +405,13 @@ document.addEventListener('DOMContentLoaded', function() {
     previews.invoiceDate.textContent = new Date().toLocaleDateString();
     
     buttons.loadSheets.addEventListener('click', populateSheetDropdown);
-    buttons.fetchData.addEventListener('click', fetchDataFromGoogleSheet);
+    // THIS IS THE KEY FIX: The main button now calls our smart function
+    buttons.fetchData.addEventListener('click', generateFromSource);
     inputs.fileUploader.addEventListener('change', (e) => handleFile(e.target.files[0]));
+    
     inputs.startDate.addEventListener('change', processAndDisplayData);
     inputs.endDate.addEventListener('change', processAndDisplayData);
+    
     inputs.billingMethod.addEventListener('change', handleBillingMethodChange);
     inputs.paymentMethod.addEventListener('input', calculateAndDisplayTotals);
     inputs.hourlyRate.addEventListener('input', calculateAndDisplayTotals);
