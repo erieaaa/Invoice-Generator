@@ -173,24 +173,18 @@ document.addEventListener('DOMContentLoaded', function() {
         previews.clientEmail.textContent = inputs.clientEmail.value || 'Email Address';
         previews.paymentMethod.textContent = inputs.paymentMethod.value || 'N/A';
         previews.paymentDetails.textContent = inputs.paymentDetails.value || 'N/A';
-        const start = inputs.startDate.value ? new Date(inputs.startDate.value).toLocaleDateString() : '...';
-        const end = inputs.endDate.value ? new Date(inputs.endDate.value).toLocaleDateString() : '...';
+        const start = inputs.startDate.value ? new Date(inputs.startDate.value + 'T00:00:00').toLocaleDateString() : '...';
+        const end = inputs.endDate.value ? new Date(inputs.endDate.value + 'T00:00:00').toLocaleDateString() : '...';
         previews.billingPeriod.textContent = `${start} – ${end}`;
     }
 
-    // --- NEW MASTER FUNCTION TO DECIDE WHICH SOURCE TO USE ---
     function generateFromSource() {
-        // Priority 1: Check if a file has been selected in the uploader.
         if (inputs.fileUploader.files.length > 0) {
-            // Data is already loaded in rawData by the 'change' event listener,
-            // so we just need to re-process it with the current date range.
             processAndDisplayData();
         } 
-        // Priority 2: Check for Google Sheet details.
         else if (inputs.spreadsheetId.value && inputs.sheetSelector.value) {
             fetchDataFromGoogleSheet();
         } 
-        // Otherwise, no valid source has been provided.
         else {
             alert('Please either upload a file OR provide a Google Sheet link and select a tab.');
         }
@@ -205,17 +199,22 @@ document.addEventListener('DOMContentLoaded', function() {
         reader.onload = function(e) {
             const data = e.target.result;
             let parsedData = [];
-            if (fileExtension === 'csv') {
-                const parsed = Papa.parse(data, { header: true, skipEmptyLines: true });
-                parsedData = parsed.data;
-            } else if (fileExtension === 'xlsx') {
-                const workbook = XLSX.read(data, { type: 'binary' });
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-                parsedData = XLSX.utils.sheet_to_json(worksheet);
+            try {
+                if (fileExtension === 'csv') {
+                    const parsed = Papa.parse(data, { header: true, skipEmptyLines: true });
+                    parsedData = parsed.data;
+                } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+                    const workbook = XLSX.read(data, { type: 'binary', cellDates:true });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    parsedData = XLSX.utils.sheet_to_json(worksheet);
+                }
+                rawData = parsedData; // Store globally
+                processAndDisplayData(); // Automatically process data
+            } catch (error) {
+                alert("There was an error parsing your file. Please ensure it's a valid CSV or XLSX file.");
+                console.error("File parsing error:", error);
             }
-            rawData = parsedData; // Store globally
-            processAndDisplayData(); // Automatically process data
         };
 
         if (fileExtension === 'csv') reader.readAsText(file);
@@ -265,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${encodeURIComponent(selectedSheet)}'?key=${API_KEY}`;
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${encodeURIComponent(selectedSheet)}'?key=${API_KEY}&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=SERIAL_NUMBER`;
         try {
             const response = await fetch(url);
             if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
@@ -274,7 +273,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!data.values || data.values.length < 2) {
                 rawData = [];
             } else {
-                // Convert Google's array-of-arrays to an array-of-objects
                 const headers = data.values[0];
                 const dataRows = data.values.slice(1);
                 rawData = dataRows.map(row => {
@@ -285,22 +283,56 @@ document.addEventListener('DOMContentLoaded', function() {
                     return obj;
                 });
             }
-            processAndDisplayData(); // Process the fetched data
+            processAndDisplayData();
         } catch (error) {
             console.error('Error fetching from Google Sheet:', error);
             alert('Failed to fetch data from Google Sheet. Check console for errors.');
         }
     }
 
-    // --- CENTRAL DATA PROCESSING FUNCTION ---
+    // --- NEW: SMART HEADER MAPPING ---
+    function mapHeaders(headers) {
+        const mapping = {};
+        const aliases = {
+            date: ['date', 'day'],
+            tasks: ['tasks', 'task', 'description', 'activity', 'work done'],
+            from: ['from', 'start time', 'start'],
+            to: ['to', 'end time', 'end'],
+            duration: ['duration', 'hours', 'time spent', 'total time']
+        };
+
+        for (const key in aliases) {
+            for (const originalHeader of headers) {
+                const lowerHeader = String(originalHeader).trim().toLowerCase();
+                if (aliases[key].includes(lowerHeader)) {
+                    mapping[key] = originalHeader;
+                    break; 
+                }
+            }
+        }
+        return mapping;
+    }
+
+    // --- UPGRADED: CENTRAL DATA PROCESSING FUNCTION ---
     function processAndDisplayData() {
         totalMinutes = 0;
         previews.invoiceBody.innerHTML = '';
-        document.getElementById('from-th').style.display = 'table-cell';
-        document.getElementById('to-th').style.display = 'table-cell';
+        updatePreview();
 
         if (rawData.length === 0) {
-            previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No data found in the source.</td></tr>';
+            previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No data loaded. Please upload a file or fetch from a Google Sheet.</td></tr>';
+            return;
+        }
+
+        // 1. Smart Header Detection
+        const headers = Object.keys(rawData[0]);
+        const mappedHeaders = mapHeaders(headers);
+
+        // 2. Validate that we found the essential columns
+        if (!mappedHeaders.date || (!mappedHeaders.duration && (!mappedHeaders.from || !mappedHeaders.to))) {
+            const message = 'Error: Could not find required columns. Please ensure your file has headers like "Date", and either "Duration" or "From"/"To".';
+            alert(message);
+            previews.invoiceBody.innerHTML = `<tr><td colspan="5" style="text-align: center;">${message}</td></tr>`;
             return;
         }
 
@@ -308,13 +340,6 @@ document.addEventListener('DOMContentLoaded', function() {
             previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Please select a billing period to filter the data.</td></tr>';
             return;
         }
-        updatePreview();
-        
-        const firstRow = rawData[0];
-        const headerMap = {};
-        Object.keys(firstRow).forEach(header => {
-            headerMap[header.trim().toLowerCase()] = header;
-        });
         
         const startDate = new Date(inputs.startDate.value);
         startDate.setHours(0, 0, 0, 0);
@@ -322,65 +347,72 @@ document.addEventListener('DOMContentLoaded', function() {
         endDate.setHours(23, 59, 59, 999);
             
         const filteredRows = rawData.filter(row => {
-            const dateStr = row[headerMap.date];
-            if (!dateStr) return false;
-            const rowDate = typeof dateStr === 'number' ? new Date(Date.UTC(0, 0, dateStr - 1)) : new Date(dateStr);
+            const dateValue = row[mappedHeaders.date];
+            if (dateValue === null || dateValue === undefined) return false;
+            
+            let rowDate;
+            // Handle Excel's serial number dates and standard date strings
+            if (typeof dateValue === 'number' && dateValue > 1) {
+                rowDate = new Date(Date.UTC(1899, 11, 30 + dateValue));
+            } else {
+                rowDate = new Date(dateValue);
+            }
+            
             return !isNaN(rowDate) && startDate <= rowDate && rowDate <= endDate;
         });
 
         if (filteredRows.length === 0) {
             previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No entries found for the selected period.</td></tr>';
+            calculateAndDisplayTotals();
             return;
         }
 
-        const isDetailedLayout = headerMap.from !== undefined && headerMap.to !== undefined;
-        const isSimpleLayout = headerMap.duration !== undefined;
+        const isDetailedLayout = mappedHeaders.from && mappedHeaders.to;
+        const isSimpleLayout = mappedHeaders.duration;
 
-        if (isDetailedLayout) {
-            filteredRows.forEach(row => {
-                const date = row[headerMap.date];
-                const tasks = row[headerMap.tasks] || '';
-                const durationStr = row[headerMap.duration] || '0:0';
-                totalMinutes += parseDurationToMinutes(durationStr);
-                const rowDate = typeof date === 'number' ? new Date(Date.UTC(0, 0, date - 1)) : new Date(date);
+        document.getElementById('from-th').style.display = isDetailedLayout ? 'table-cell' : 'none';
+        document.getElementById('to-th').style.display = isDetailedLayout ? 'table-cell' : 'none';
 
-                const tr = document.createElement('tr');
+        filteredRows.forEach(row => {
+            const dateValue = row[mappedHeaders.date];
+            let rowDate;
+            if (typeof dateValue === 'number' && dateValue > 1) {
+                rowDate = new Date(Date.UTC(1899, 11, 30 + dateValue));
+            } else {
+                rowDate = new Date(dateValue);
+            }
+
+            const tasks = row[mappedHeaders.tasks] || '';
+            const durationStr = row[mappedHeaders.duration] || '0:0';
+            totalMinutes += parseDurationToMinutes(durationStr);
+            
+            const tr = document.createElement('tr');
+
+            if(isDetailedLayout) {
                 tr.innerHTML = `
                     <td>${rowDate.toLocaleDateString()}</td>
                     <td>${tasks}</td>
-                    <td>${formatTime(row[headerMap.from] || '')}</td>
-                    <td>${formatTime(row[headerMap.to] || '')}</td>
+                    <td>${formatTime(row[mappedHeaders.from] || '')}</td>
+                    <td>${formatTime(row[mappedHeaders.to] || '')}</td>
                     <td>${durationStr}</td>
                 `;
-                previews.invoiceBody.appendChild(tr);
-            });
-        } else if (isSimpleLayout) {
-            document.getElementById('from-th').style.display = 'none';
-            document.getElementById('to-th').style.display = 'none';
-            filteredRows.forEach(row => {
-                const date = row[headerMap.date];
-                const tasks = row[headerMap.tasks] || '';
-                const durationStr = row[headerMap.duration] || '0';
-                totalMinutes += parseDurationToMinutes(durationStr);
-                const rowDate = typeof date === 'number' ? new Date(Date.UTC(0, 0, date - 1)) : new Date(date);
-                
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
+            } else { // Simple layout (Date, Task, Duration)
+                 tr.innerHTML = `
                     <td>${rowDate.toLocaleDateString()}</td>
-                    <td>${tasks}</td>
-                    <td style="display: none;"></td>
-                    <td style="display: none;"></td>
+                    <td colspan="3">${tasks}</td>
                     <td>${durationStr}</td>
                 `;
-                previews.invoiceBody.appendChild(tr);
-            });
-        } else {
-            alert('Sheet format not recognized. Header row must contain either ("date", "tasks", "from", "to", "duration") or ("date", "tasks", "duration").');
-        }
+                // Hide the 'from'/'to' columns in the row as well for proper alignment
+                tr.cells[2].style.display = 'none';
+                tr.cells[3].style.display = 'none';
+                tr.cells[1].setAttribute('colspan', '3');
+            }
+            previews.invoiceBody.appendChild(tr);
+        });
 
-        const totalHours = Math.floor(totalMinutes / 60);
+        const totalHoursVal = Math.floor(totalMinutes / 60);
         const remainingMinutes = totalMinutes % 60;
-        previews.totalHours.textContent = `${String(totalHours).padStart(2, '0')}:${String(remainingMinutes).padStart(2, '0')}`;
+        previews.totalHours.textContent = `${String(totalHoursVal).padStart(2, '0')}:${String(remainingMinutes).padStart(2, '0')}`;
         calculateAndDisplayTotals();
     }
     
@@ -405,12 +437,13 @@ document.addEventListener('DOMContentLoaded', function() {
     previews.invoiceDate.textContent = new Date().toLocaleDateString();
     
     buttons.loadSheets.addEventListener('click', populateSheetDropdown);
-    // THIS IS THE KEY FIX: The main button now calls our smart function
     buttons.fetchData.addEventListener('click', generateFromSource);
     inputs.fileUploader.addEventListener('change', (e) => handleFile(e.target.files[0]));
     
-    inputs.startDate.addEventListener('change', processAndDisplayData);
-    inputs.endDate.addEventListener('change', processAndDisplayData);
+    // Make date changes automatically re-process the loaded data
+    const reprocessOnChange = () => { if (rawData.length > 0) processAndDisplayData(); };
+    inputs.startDate.addEventListener('change', reprocessOnChange);
+    inputs.endDate.addEventListener('change', reprocessOnChange);
     
     inputs.billingMethod.addEventListener('change', handleBillingMethodChange);
     inputs.paymentMethod.addEventListener('input', calculateAndDisplayTotals);
@@ -418,7 +451,7 @@ document.addEventListener('DOMContentLoaded', function() {
     inputs.fixedRate.addEventListener('input', calculateAndDisplayTotals);
     
     Object.values(inputs).forEach(input => {
-        if (!['billingMethod', 'hourlyRate', 'fixedRate', 'paymentMethod'].includes(input.id)) {
+        if (!['billingMethod', 'hourlyRate', 'fixedRate', 'paymentMethod', 'startDate', 'endDate', 'fileUploader'].includes(input.id)) {
             input.addEventListener('input', updatePreview);
         }
     });
