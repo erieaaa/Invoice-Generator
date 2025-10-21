@@ -4,7 +4,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- GLOBAL STATE ---
     let totalMinutes = 0;
-    let rawData = []; // Store data from either source (file or GSheet)
 
     // --- ELEMENT SELECTORS ---
     const inputs = {
@@ -13,7 +12,6 @@ document.addEventListener('DOMContentLoaded', function() {
         clientEmail: document.getElementById('client-email'),
         spreadsheetId: document.getElementById('spreadsheet-id'),
         sheetSelector: document.getElementById('sheet-selector'),
-        fileUploader: document.getElementById('file-uploader'),
         startDate: document.getElementById('start-date'),
         endDate: document.getElementById('end-date'),
         paymentMethod: document.getElementById('payment-method'),
@@ -90,11 +88,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- HELPER FUNCTIONS ---
     function formatTime(timeString) {
-        if (!timeString || String(timeString).toUpperCase().includes('AM') || String(timeString).toUpperCase().includes('PM')) {
+        if (!timeString || timeString.toUpperCase().includes('AM') || timeString.toUpperCase().includes('PM')) {
             return timeString;
         }
         try {
-            let [hours, minutes] = String(timeString).split(':').map(Number);
+            let [hours, minutes] = timeString.split(':').map(Number);
             const ampm = hours >= 12 ? 'PM' : 'AM';
             hours = hours % 12;
             hours = hours ? hours : 12;
@@ -103,29 +101,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (e) {
             return timeString;
         }
-    }
-
-    function parseDurationToMinutes(durationStr) {
-        if (!durationStr) return 0;
-        durationStr = String(durationStr).trim();
-
-        if (durationStr.includes(':')) {
-            const [hours, minutes] = durationStr.split(':').map(Number);
-            return (hours || 0) * 60 + (minutes || 0);
-        } else {
-            const decimalHours = parseFloat(durationStr);
-            return isNaN(decimalHours) ? 0 : decimalHours * 60;
-        }
-    }
-    
-    function parseTimeValueToMinutes(timeValue) {
-        if (typeof timeValue === 'number') {
-            return timeValue; // It's already in minutes or decimal hours from the sheet
-        }
-        if (typeof timeValue === 'string') {
-            return parseDurationToMinutes(timeValue);
-        }
-        return 0;
     }
 
     function handleBillingMethodChange() {
@@ -173,69 +148,10 @@ document.addEventListener('DOMContentLoaded', function() {
         previews.totalAmount.textContent = `$${totalAmount.toFixed(2)}`;
     }
 
-    function generateInvoiceId() {
-        return `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    }
-
-    function updatePreview() {
-        previews.clientName.textContent = inputs.clientName.value || 'Client Name';
-        previews.clientCompany.textContent = inputs.clientCompany.value || 'Company Name';
-        previews.clientEmail.textContent = inputs.clientEmail.value || 'Email Address';
-        previews.paymentMethod.textContent = inputs.paymentMethod.value || 'N/A';
-        previews.paymentDetails.textContent = inputs.paymentDetails.value || 'N/A';
-        const start = inputs.startDate.value ? new Date(inputs.startDate.value + 'T00:00:00').toLocaleDateString() : '...';
-        const end = inputs.endDate.value ? new Date(inputs.endDate.value + 'T00:00:00').toLocaleDateString() : '...';
-        previews.billingPeriod.textContent = `${start} – ${end}`;
-    }
-
-    function generateFromSource() {
-        if (inputs.fileUploader.files.length > 0) {
-            processAndDisplayData();
-        } 
-        else if (inputs.spreadsheetId.value && inputs.sheetSelector.value) {
-            fetchDataFromGoogleSheet();
-        } 
-        else {
-            alert('Please either upload a file OR provide a Google Sheet link and select a tab.');
-        }
-    }
-
-    // --- DATA SOURCE LOGIC (FILE UPLOAD) ---
-    function handleFile(file) {
-        if (!file) return;
-        const reader = new FileReader();
-        const fileExtension = file.name.split('.').pop().toLowerCase();
-
-        reader.onload = function(e) {
-            const data = e.target.result;
-            let parsedData = [];
-            try {
-                if (fileExtension === 'csv') {
-                    const parsed = Papa.parse(data, { header: true, skipEmptyLines: true });
-                    parsedData = parsed.data;
-                } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-                    const workbook = XLSX.read(data, { type: 'binary', cellDates:true });
-                    const sheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[sheetName];
-                    parsedData = XLSX.utils.sheet_to_json(worksheet);
-                }
-                rawData = parsedData;
-                processAndDisplayData();
-            } catch (error) {
-                alert("There was an error parsing your file. Please ensure it's a valid CSV or XLSX file.");
-                console.error("File parsing error:", error);
-            }
-        };
-
-        if (fileExtension === 'csv') reader.readAsText(file);
-        else reader.readAsBinaryString(file);
-    }
-
-    // --- DATA SOURCE LOGIC (GOOGLE SHEETS) ---
     async function populateSheetDropdown() {
         let spreadsheetId = inputs.spreadsheetId.value.trim();
         if (spreadsheetId.includes('/d/')) {
-            const match = spreadsheetId.match(/\/d\/([a-zA-Z0-Z0-9-_]+)/);
+            const match = spreadsheetId.match(/\/d\/([a-zA-Z0-9-_]+)/);
             if (match && match[1]) {
                 spreadsheetId = match[1];
                 inputs.spreadsheetId.value = spreadsheetId;
@@ -265,84 +181,161 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    async function fetchDataFromGoogleSheet() {
-        const spreadsheetId = inputs.spreadsheetId.value.trim();
-        const selectedSheet = inputs.sheetSelector.value;
+    function generateInvoiceId() {
+        return `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
 
-        if (!spreadsheetId || !selectedSheet) {
-            alert('Please provide a Google Sheet ID and select a tab.');
+    function updatePreview() {
+        previews.clientName.textContent = inputs.clientName.value || 'Client Name';
+        previews.clientCompany.textContent = inputs.clientCompany.value || 'Company Name';
+        previews.clientEmail.textContent = inputs.clientEmail.value || 'Email Address';
+        previews.paymentMethod.textContent = inputs.paymentMethod.value || 'N/A';
+        previews.paymentDetails.textContent = inputs.paymentDetails.value || 'N/A';
+        const start = inputs.startDate.value ? new Date(inputs.startDate.value).toLocaleDateString() : '...';
+        const end = inputs.endDate.value ? new Date(inputs.endDate.value).toLocaleDateString() : '...';
+        previews.billingPeriod.textContent = `${start} – ${end}`;
+    }
+    
+    async function fetchAndDisplayData() {
+        totalMinutes = 0;
+        previews.invoiceBody.innerHTML = '';
+        const selectedSheet = inputs.sheetSelector.value;
+        const spreadsheetId = inputs.spreadsheetId.value.trim();
+
+        if (!spreadsheetId) {
+            alert('The Google Sheet ID is missing.');
+            return;
+        }
+        if (!selectedSheet || !inputs.startDate.value || !inputs.endDate.value) {
+            alert('Please select a timesheet tab and a valid date range.');
             return;
         }
 
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${encodeURIComponent(selectedSheet)}'?key=${API_KEY}&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=SERIAL_NUMBER`;
+        updatePreview();
+        
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${encodeURIComponent(selectedSheet)}'?key=${API_KEY}`;
         try {
             const response = await fetch(url);
             if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
             const data = await response.json();
 
-            if (!data.values || data.values.length < 2) {
-                rawData = [];
+            if (!data.values || data.values.length <= 1) {
+                previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No data found in this sheet.</td></tr>';
+                return;
+            }
+
+            const headerRow = data.values[0];
+            const headerMap = {};
+            headerRow.forEach((header, index) => {
+                headerMap[header.trim().toLowerCase()] = index;
+            });
+
+            const requiredHeaders = ['date', 'tasks', 'from', 'to', 'duration'];
+            const missingHeaders = requiredHeaders.filter(h => headerMap[h] === undefined);
+
+            if (missingHeaders.length > 0) {
+                alert(`Error: Your sheet is missing the following required columns: ${missingHeaders.join(', ')}`);
+                return;
+            }
+            
+            const dataRows = data.values.slice(1);
+            
+            // --- ========================================================= ---
+            // --- THIS IS THE FIX FOR THE DATE RANGE PROBLEM ---
+            // --- ========================================================= ---
+            const startDate = new Date(inputs.startDate.value);
+            startDate.setHours(0, 0, 0, 0); // Set to the beginning of the start day
+
+            const endDate = new Date(inputs.endDate.value);
+            endDate.setHours(23, 59, 59, 999); // Set to the end of the end day
+            
+            const filteredRows = dataRows.filter(row => {
+                const dateStr = row[headerMap.date];
+                if (!dateStr) return false;
+                const rowDate = new Date(dateStr);
+                // Use the adjusted start and end dates for comparison
+                return !isNaN(rowDate) && startDate <= rowDate && rowDate <= endDate;
+            });
+            // --- END OF FIX ---
+
+            if (filteredRows.length === 0) {
+                previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No entries found for the selected period.</td></tr>';
             } else {
-                const headers = data.values[0];
-                const dataRows = data.values.slice(1);
-                rawData = dataRows.map(row => {
-                    const obj = {};
-                    headers.forEach((header, index) => {
-                        obj[header] = row[index];
-                    });
-                    return obj;
+                filteredRows.forEach(row => {
+                    const date = row[headerMap.date];
+                    const tasks = row[headerMap.tasks] || '';
+                    const rawTimeFrom = row[headerMap.from] || '';
+                    const rawTimeTo = row[headerMap.to] || '';
+                    const durationStr = row[headerMap.duration] || '0:0';
+                    
+                    const timeFrom = formatTime(rawTimeFrom);
+                    const timeTo = formatTime(rawTimeTo);
+                    const [hours, minutes] = durationStr.split(':').map(Number);
+                    totalMinutes += (hours || 0) * 60 + (minutes || 0);
+                    
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${new Date(date).toLocaleDateString()}</td>
+                        <td>${tasks}</td>
+                        <td>${timeFrom}</td>
+                        <td>${timeTo}</td>
+                        <td>${durationStr}</td>
+                    `;
+                    previews.invoiceBody.appendChild(tr);
                 });
             }
-            processAndDisplayData();
+
+            const totalHours = Math.floor(totalMinutes / 60);
+            const remainingMinutes = totalMinutes % 60;
+            previews.totalHours.textContent = `${String(totalHours).padStart(2, '0')}:${String(remainingMinutes).padStart(2, '0')}`;
+            calculateAndDisplayTotals();
+
         } catch (error) {
-            console.error('Error fetching from Google Sheet:', error);
+            console.error('Error fetching sheet data:', error);
             alert('Failed to fetch data from Google Sheet. Check console for errors.');
         }
     }
 
-    // --- SMART HEADER MAPPING ---
-    function mapHeaders(headers) {
-        const mapping = {};
-        const aliases = {
-            date: ['date', 'day'],
-            tasks: ['tasks', 'task', 'description', 'activity', 'work done', 'note', 'project'],
-            from: ['from', 'start time', 'start'],
-            to: ['to', 'end time', 'end'],
-            duration: ['duration', 'hours', 'time spent', 'total time', 'entry time (minutes)']
-        };
 
-        for (const key in aliases) {
-            for (const originalHeader of headers) {
-                const lowerHeader = String(originalHeader).trim().toLowerCase();
-                if (aliases[key].includes(lowerHeader)) {
-                    mapping[key] = originalHeader;
-                    break; 
-                }
-            }
-        }
-        return mapping;
+    function generatePdf() {
+        window.scrollTo(0, 0);
+        const invoiceElement = document.getElementById('invoice-preview');
+        const clientName = inputs.clientCompany.value || 'Invoice';
+        const invoiceId = previews.invoiceId.textContent;
+        const opt = {
+            margin: [0.5, 0.25, 0.5, 0.25],
+            filename: `${clientName}_${invoiceId}.pdf`,
+            pagebreak: { mode: 'css', avoid: ['thead', 'tr', '.invoice-footer'] },
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+        html2pdf().from(invoiceElement).set(opt).save();
     }
 
-    // --- CENTRAL DATA PROCESSING FUNCTION ---
-    function processAndDisplayData() {
-        totalMinutes = 0;
-        previews.invoiceBody.innerHTML = '';
-        updatePreview();
-
-        if (rawData.length === 0) {
-            previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No data loaded. Please upload a file or fetch from a Google Sheet.</td></tr>';
-            return;
+    // --- INITIALIZATION & EVENT LISTENERS ---
+    previews.invoiceId.textContent = generateInvoiceId();
+    previews.invoiceDate.textContent = new Date().toLocaleDateString();
+    
+    inputs.billingMethod.addEventListener('change', handleBillingMethodChange);
+    inputs.paymentMethod.addEventListener('input', calculateAndDisplayTotals);
+    inputs.hourlyRate.addEventListener('input', calculateAndDisplayTotals);
+    inputs.fixedRate.addEventListener('input', calculateAndDisplayTotals);
+    
+    Object.values(inputs).forEach(input => {
+        if (!['billingMethod', 'hourlyRate', 'fixedRate', 'paymentMethod'].includes(input.id)) {
+            input.addEventListener('input', updatePreview);
         }
-
-        const headers = Object.keys(rawData[0]);
-        const mappedHeaders = mapHeaders(headers);
-        
-        if (!mappedHeaders.date || !mappedHeaders.tasks || (!mappedHeaders.duration && (!mappedHeaders.from || !mappedHeaders.to))) {
-            const message = 'Error: Could not find required columns. Please ensure your file has headers for "Date", "Tasks" (e.g., Note, Description), and "Duration" (or "From"/"To").';
-            alert(message);
-            previews.invoiceBody.innerHTML = `<tr><td colspan="5" style="text-align: center;">${message}</td></tr>`;
-            return;
-        }
-
-        if (!inputs.startDate.value || !inputs.endDate.value) {
-            previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Please select a billing period to filter the data.</td></tr>';
+    });
+    
+    buttons.loadSheets.addEventListener('click', populateSheetDropdown);
+    buttons.fetchData.addEventListener('click', fetchAndDisplayData);
+    buttons.generatePdf.addEventListener('click', generatePdf);
+    buttons.saveDefaults.addEventListener('click', saveDefaults);
+    buttons.clearDefaults.addEventListener('click', clearDefaults);
+    
+    // --- FINAL SETUP ---
+    loadDefaults(); 
+    updatePreview(); 
+    handleBillingMethodChange();
+});
