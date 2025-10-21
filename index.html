@@ -3,18 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hybrid Invoice Generator</title>
+    <title>Creative Invoice Generator</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    
-    <!-- PDF Generation Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    
-    <!-- File Parsing Libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -34,19 +28,18 @@
                 </div>
             </div>
 
-            <!-- COMBINED DATA SOURCE SECTION -->
-            <div class="control-group data-source">
-                <h3>Data Source (Choose One)</h3>
-                
-                <h4>Option 1: Paste Google Sheet Link</h4>
-                <input type="text" id="spreadsheet-id" placeholder="Paste Google Sheet ID or URL">
+            <!-- NEW: Section for specifying the Google Sheet -->
+            <div class="control-group">
+                <h3>Google Sheet Source:</h3>
+                <input type="text" id="spreadsheet-id" placeholder="Paste Google Sheet ID or URL here">
                 <button id="load-sheets-btn">Load Sheet Tabs</button>
-                <select id="sheet-selector" style="margin-top: 0.5rem;">
-                    <option value="">Load a sheet to see tabs</option>
+            </div>
+            
+            <div class="control-group">
+                <h3>Select Timesheet Tab:</h3>
+                <select id="sheet-selector">
+                    <option value="">Enter Sheet ID and click Load</option>
                 </select>
-
-                <h4>Option 2: Upload File</h4>
-                <input type="file" id="file-uploader" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
             </div>
             
             <div class="control-group">
@@ -57,9 +50,8 @@
                     <label for="end-date">To:</label>
                     <input type="date" id="end-date">
                 </div>
-                <button id="fetch-data-btn">Generate from Source</button>
+                <button id="fetch-data-btn">Get Timesheet Data</button>
             </div>
-
             <div class="control-group">
                 <h3>Billing Method</h3>
                 <select id="billing-method">
@@ -77,7 +69,6 @@
                     </div>
                 </div>
             </div>
-
             <div class="control-group">
                 <h3>Payment Info:</h3>
                 <input type="text" id="payment-method" placeholder="Payment Method (e.g., Payoneer, PayPal)">
@@ -116,13 +107,13 @@
                         <tr>
                             <th class="date-col">Date</th>
                             <th class="task-col">Tasks</th>
-                            <th id="from-th" class="time-col">From</th>
-                            <th id="to-th" class="time-col">To</th>
+                            <th class="time-col">From</th>
+                            <th class="time-col">To</th>
                             <th class="time-col">Duration</th>
                         </tr>
                     </thead>
                     <tbody id="invoice-body">
-                        <tr><td colspan="5" style="text-align: center;">Please provide a data source and select a billing period.</td></tr>
+                        <tr><td colspan="5" style="text-align: center;">Please fill out the form to generate the invoice.</td></tr>
                     </tbody>
                 </table>
                 <footer class="invoice-footer">
