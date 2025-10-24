@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     // --- CONFIGURATION ---
-    const API_KEY = 'AIzaSyDC19jZi4kwBD-3Pr0bFIdESTw5FrAZO8M'; // IMPORTANT! Replace with your actual Google Sheets API key
+    // Make sure your real, valid API key from Google Cloud Console is pasted here.
+    const API_KEY = 'YOUR_REAL_API_KEY_HERE'; 
 
 
     // --- GLOBAL STATE ---
@@ -167,7 +168,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- DATA FETCHING & PROCESSING ---
     
-    // FIX #1: Re-introduce the smart header mapping function
     function mapHeaders(headers) {
         const mapping = {};
         const aliases = {
@@ -207,7 +207,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?key=${API_KEY}`;
         try {
             const response = await fetch(url);
-            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}. Check if the Sheet is public or if the API key is correct.`);
+            if (!response.ok) {
+                const errorData = await response.json();
+                const errorMessage = errorData.error.message || `HTTP error! Status: ${response.status}`;
+                throw new Error(errorMessage);
+            }
             const data = await response.json();
             inputs.sheetSelector.innerHTML = '';
             data.sheets.forEach(sheet => {
@@ -218,7 +222,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         } catch (error) {
             console.error('Error fetching sheet names:', error);
-            alert(`Failed to load sheet tabs. ${error.message}`);
+            alert(`Failed to load sheet tabs. Check the console, but the most likely reasons are:\n1. Invalid Google Sheet ID.\n2. Invalid API Key.\n3. The "Google Sheets API" is not enabled in your Google Cloud project.\n\nError: ${error.message}`);
             inputs.sheetSelector.innerHTML = '<option value="">Error loading tabs</option>';
         }
     }
@@ -231,13 +235,17 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${encodeURIComponent(selectedSheet)}'?key=${API_KEY}`;
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(selectedSheet)}?key=${API_KEY}`;
         try {
             const response = await fetch(url);
-            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+             if (!response.ok) {
+                const errorData = await response.json();
+                const errorMessage = errorData.error.message || `HTTP error! Status: ${response.status}`;
+                throw new Error(errorMessage);
+            }
             const data = await response.json();
 
-            if (!data.values || data.values.length < 2) {
+            if (!data.values || data.values.length < 1) { // Changed to < 1 to allow sheets with only a header
                 rawData = [];
             } else {
                 const headers = data.values[0];
@@ -250,11 +258,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     return obj;
                 });
             }
-            // After fetching, process the data
             processAndDisplayData();
         } catch (error) {
             console.error('Error fetching from Google Sheet:', error);
-            alert('Failed to fetch data from Google Sheet. Check console for errors.');
+            alert(`Failed to fetch timesheet data. Check the console, but the most likely reason is:\n1. The Google Sheet is NOT public ("Anyone with the link").\n\nError: ${error.message}`);
         }
     }
 
@@ -263,12 +270,20 @@ document.addEventListener('DOMContentLoaded', function() {
         previews.invoiceBody.innerHTML = '';
         updatePreview();
 
-        if (rawData.length === 0) {
-            previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No data has been loaded from the sheet.</td></tr>';
+        if (rawData.length === 0 && !inputs.startDate.value) {
+            previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No data loaded. Click "Get Timesheet Data".</td></tr>';
             return;
         }
         if (!inputs.startDate.value || !inputs.endDate.value) {
             previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Please select a billing period to filter the data.</td></tr>';
+            return;
+        }
+        
+        // This handles the case where the sheet has headers but no data rows
+        if(rawData.length === 0) {
+            previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No entries found for the selected period.</td></tr>';
+            previews.totalHours.textContent = '00:00';
+            calculateAndDisplayTotals();
             return;
         }
 
@@ -276,13 +291,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const mappedHeaders = mapHeaders(headers);
 
         if (!mappedHeaders.date || !mappedHeaders.tasks || !mappedHeaders.duration) {
-             const message = 'Error: Could not find required columns. Please ensure your sheet has headers for "Date", "Tasks" (e.g., Note), and "Duration".';
+             const message = 'Error: Could not find required columns. Please ensure your sheet has headers like "Date", "Tasks", and "Duration".';
             alert(message);
             previews.invoiceBody.innerHTML = `<tr><td colspan="5" style="text-align: center;">${message}</td></tr>`;
             return;
         }
 
-        // FIX #2: Timezone-safe date filtering
         const startDateStr = inputs.startDate.value.split('-');
         const startDate = new Date(Date.UTC(startDateStr[0], startDateStr[1] - 1, startDateStr[2]));
 
@@ -292,8 +306,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const filteredRows = rawData.filter(row => {
             const dateStr = row[mappedHeaders.date];
             if (!dateStr) return false;
-            // Handle different date formats from sheet robustly
-            const rowDate = new Date(dateStr + 'T00:00:00Z'); // Treat sheet date as UTC
+            const rowDate = new Date(dateStr + 'T00:00:00Z'); 
             return !isNaN(rowDate) && startDate.getTime() <= rowDate.getTime() && rowDate.getTime() <= endDate.getTime();
         });
 
@@ -307,8 +320,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 const to = row[mappedHeaders.to] || '';
                 const durationStr = row[mappedHeaders.duration] || '0:0';
                 
-                const [hours, minutes] = String(durationStr).split(':').map(Number);
-                totalMinutes += (hours || 0) * 60 + (minutes || 0);
+                // Robustly handle duration that might be just a number (of minutes)
+                if (String(durationStr).includes(':')) {
+                    const [hours, minutes] = String(durationStr).split(':').map(Number);
+                    totalMinutes += (hours || 0) * 60 + (minutes || 0);
+                } else if (!isNaN(Number(durationStr))) {
+                    totalMinutes += Number(durationStr);
+                }
                 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -353,19 +371,17 @@ document.addEventListener('DOMContentLoaded', function() {
     inputs.hourlyRate.addEventListener('input', calculateAndDisplayTotals);
     inputs.fixedRate.addEventListener('input', calculateAndDisplayTotals);
     
-    // Auto-update preview for info fields
     Object.keys(inputs).forEach(key => {
         if (['clientName', 'clientCompany', 'clientEmail', 'paymentMethod', 'paymentDetails'].includes(key)) {
             inputs[key].addEventListener('input', updatePreview);
         }
     });
 
-    // When date range changes, re-filter the already-loaded data
     inputs.startDate.addEventListener('change', processAndDisplayData);
     inputs.endDate.addEventListener('change', processAndDisplayData);
     
     buttons.loadSheets.addEventListener('click', populateSheetDropdown);
-    buttons.fetchData.addEventListener('click', fetchData); // This button now ONLY fetches new data
+    buttons.fetchData.addEventListener('click', fetchData);
     buttons.generatePdf.addEventListener('click', generatePdf);
     buttons.saveDefaults.addEventListener('click', saveDefaults);
     buttons.clearDefaults.addEventListener('click', clearDefaults);
