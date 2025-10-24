@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     // --- CONFIGURATION ---
     // Make sure your real, valid API key from Google Cloud Console is pasted here.
-    const API_KEY = 'YOUR_REAL_API_KEY_HERE'; 
+    const API_KEY = 'AIzaSyDC19jZi4kwBD-3Pr0bFIdESTw5FrAZO8M'; 
 
 
     // --- GLOBAL STATE ---
@@ -391,3 +391,4 @@ document.addEventListener('DOMContentLoaded', function() {
     updatePreview(); 
     handleBillingMethodChange();
 });
+
