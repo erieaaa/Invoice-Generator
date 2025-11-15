@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     // --- CONFIGURATION ---
-    // IMPORTANT! You still need to replace this placeholder with your real API key.
+    // IMPORTANT! This is a placeholder. Replace with your actual Google Sheets API key.
+    // WARNING: Do not commit your real API key to public repositories.
     const API_KEY = 'AIzaSyDC19jZi4kwBD-3Pr0bFIdESTw5FrAZO8M'; 
 
     // --- GLOBAL STATE ---
@@ -131,10 +132,9 @@ document.addEventListener('DOMContentLoaded', function() {
         calculateAndDisplayTotals();
     }
     
-    // --- THIS IS THE CORRECTED FUNCTION ---
     function calculateAndDisplayTotals() {
         const method = inputs.billingMethod.value;
-        const paymentMethod = inputs.paymentMethod.value.toLowerCase().trim(); // Get and clean the value
+        const paymentMethod = inputs.paymentMethod.value.toLowerCase().trim();
         let subtotal = 0;
 
         if (method === 'hourly') {
@@ -148,31 +148,24 @@ document.addEventListener('DOMContentLoaded', function() {
         let fee = 0;
         let totalAmount = subtotal;
 
-        // 1. Set the default state first: Hide all fee-related elements.
         previews.subtotalContainer.classList.add('hidden');
         previews.feeContainer.classList.add('hidden');
         previews.totalAmountLabel.textContent = method === 'fixed' ? 'Fixed Project Total' : 'Total Amount';
 
-        // 2. Use a more flexible check with .includes()
-        // This will now work for "Payoneer", "payoneer transfer", etc.
         if (paymentMethod.includes('payoneer') && subtotal > 0) {
             fee = subtotal * 0.02;
             totalAmount = subtotal + fee;
 
-            // Update the text content for the fee breakdown
             previews.subtotal.textContent = `$${subtotal.toFixed(2)}`;
             previews.fee.textContent = `$${fee.toFixed(2)}`;
             previews.totalAmountLabel.textContent = 'Grand Total';
 
-            // Now, show the fee elements
             previews.subtotalContainer.classList.remove('hidden');
             previews.feeContainer.classList.remove('hidden');
         }
 
-        // Finally, always update the main total amount
         previews.totalAmount.textContent = `$${totalAmount.toFixed(2)}`;
     }
-
 
     function generateInvoiceId() {
         return `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -184,7 +177,6 @@ document.addEventListener('DOMContentLoaded', function() {
         previews.clientEmail.textContent = inputs.clientEmail.value || 'Email Address';
         previews.paymentMethod.textContent = inputs.paymentMethod.value || 'N/A';
         previews.paymentDetails.textContent = inputs.paymentDetails.value || 'N/A';
-        // Fix: Ensure dates are handled correctly even if one is missing
         const startDateValue = inputs.startDate.value;
         const endDateValue = inputs.endDate.value;
         const start = startDateValue ? new Date(startDateValue + 'T00:00:00').toLocaleDateString() : '...';
@@ -192,7 +184,6 @@ document.addEventListener('DOMContentLoaded', function() {
         previews.billingPeriod.textContent = `${start} – ${end}`;
     }
 
-    // --- NEW MASTER FUNCTION TO DECIDE WHICH SOURCE TO USE ---
     function generateFromSource() {
         if (inputs.fileUploader.files.length > 0) {
             handleFile(inputs.fileUploader.files[0]);
@@ -205,7 +196,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- DATA SOURCE LOGIC (FILE UPLOAD) ---
     function handleFile(file) {
         if (!file) return;
         const reader = new FileReader();
@@ -214,24 +204,28 @@ document.addEventListener('DOMContentLoaded', function() {
         reader.onload = function(e) {
             const data = e.target.result;
             let parsedData = [];
-            if (fileExtension === 'csv') {
-                const parsed = Papa.parse(data, { header: true, skipEmptyLines: true });
-                parsedData = parsed.data;
-            } else if (fileExtension === 'xlsx') {
-                const workbook = XLSX.read(data, { type: 'binary' });
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-                parsedData = XLSX.utils.sheet_to_json(worksheet);
+            try {
+                if (fileExtension === 'csv') {
+                    const parsed = Papa.parse(data, { header: true, skipEmptyLines: true });
+                    parsedData = parsed.data;
+                } else if (fileExtension === 'xlsx') {
+                    const workbook = XLSX.read(data, { type: 'binary' });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    parsedData = XLSX.utils.sheet_to_json(worksheet);
+                }
+                rawData = parsedData; 
+                processAndDisplayData();
+            } catch (error) {
+                console.error("File parsing error:", error);
+                alert(`Could not parse the file. Ensure it is a valid ${fileExtension.toUpperCase()} file.`);
             }
-            rawData = parsedData; 
-            processAndDisplayData();
         };
 
         if (fileExtension === 'csv') reader.readAsText(file);
         else if (fileExtension === 'xlsx') reader.readAsBinaryString(file);
     }
 
-    // --- DATA SOURCE LOGIC (GOOGLE SHEETS) ---
     async function populateSheetDropdown() {
         let spreadsheetId = inputs.spreadsheetId.value.trim();
         if (spreadsheetId.includes('/d/')) {
@@ -251,7 +245,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await fetch(url);
             if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}. Check if the Sheet is public or if the API key is correct.`);
             const data = await response.json();
-            inputs.sheetSelector.innerHTML = '';
+            inputs.sheetSelector.innerHTML = '<option value="">-- Select a Tab --</option>';
             data.sheets.forEach(sheet => {
                 const option = document.createElement('option');
                 option.value = sheet.properties.title;
@@ -300,7 +294,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- CENTRAL DATA PROCESSING FUNCTION ---
     function processAndDisplayData() {
         totalMinutes = 0;
         previews.invoiceBody.innerHTML = '';
@@ -333,10 +326,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const dateStr = row[dateHeader];
             if (!dateStr) return false;
 
-            // Handle Excel's numeric date format
             let rowDate;
-            if (typeof dateStr === 'number' && dateStr > 10000) { // Likely an Excel date serial number
-                rowDate = new Date(Date.UTC(0, 0, dateStr - 1));
+            // Handle Excel's numeric date format more accurately
+            if (typeof dateStr === 'number' && dateStr > 10000) {
+                // Excel's epoch starts on 1899-12-30
+                const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+                rowDate = new Date(excelEpoch.getTime() + dateStr * 24 * 60 * 60 * 1000);
             } else {
                 rowDate = new Date(dateStr);
             }
@@ -350,27 +345,28 @@ document.addEventListener('DOMContentLoaded', function() {
             const isDetailedLayout = (headerMap.from !== undefined && headerMap.to !== undefined) || (headerMap['start time'] !== undefined && headerMap['end time'] !== undefined);
             const isSimpleLayout = headerMap.duration !== undefined || headerMap.hours !== undefined;
 
-            if (isDetailedLayout) {
-                filteredRows.forEach(row => {
-                    const dateHeader = headerMap.date || headerMap.day;
-                    const tasksHeader = headerMap.tasks || headerMap.note || headerMap.description;
+            filteredRows.forEach(row => {
+                const dateHeader = headerMap.date || headerMap.day;
+                const tasksHeader = headerMap.tasks || headerMap.note || headerMap.description;
+                const durationHeader = headerMap.duration || headerMap.hours;
+                
+                const date = row[dateHeader];
+                const tasks = row[tasksHeader] || '';
+                const durationStr = row[durationHeader] || '0';
+                totalMinutes += parseDurationToMinutes(durationStr);
+
+                let rowDate;
+                if (typeof date === 'number' && date > 10000) {
+                     const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+                     rowDate = new Date(excelEpoch.getTime() + date * 24 * 60 * 60 * 1000);
+                } else {
+                    rowDate = new Date(date);
+                }
+                
+                const tr = document.createElement('tr');
+                if (isDetailedLayout) {
                     const fromHeader = headerMap.from || headerMap['start time'];
                     const toHeader = headerMap.to || headerMap['end time'];
-                    const durationHeader = headerMap.duration || headerMap.hours;
-
-                    const date = row[dateHeader];
-                    const tasks = row[tasksHeader] || '';
-                    const durationStr = row[durationHeader] || '0:0';
-                    totalMinutes += parseDurationToMinutes(durationStr);
-                    
-                    let rowDate;
-                    if (typeof date === 'number' && date > 10000) {
-                        rowDate = new Date(Date.UTC(0, 0, date - 1));
-                    } else {
-                        rowDate = new Date(date);
-                    }
-
-                    const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>${rowDate.toLocaleDateString()}</td>
                         <td>${tasks}</td>
@@ -378,40 +374,20 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td>${formatTime(row[toHeader] || '')}</td>
                         <td>${durationStr}</td>
                     `;
-                    previews.invoiceBody.appendChild(tr);
-                });
-            } else if (isSimpleLayout) {
-                document.getElementById('from-th').style.display = 'none';
-                document.getElementById('to-th').style.display = 'none';
-                filteredRows.forEach(row => {
-                    const dateHeader = headerMap.date || headerMap.day;
-                    const tasksHeader = headerMap.tasks || headerMap.note || headerMap.description;
-                    const durationHeader = headerMap.duration || headerMap.hours;
-                    
-                    const date = row[dateHeader];
-                    const tasks = row[tasksHeader] || '';
-                    const durationStr = row[durationHeader] || '0';
-                    totalMinutes += parseDurationToMinutes(durationStr);
-
-                    let rowDate;
-                    if (typeof date === 'number' && date > 10000) {
-                        rowDate = new Date(Date.UTC(0, 0, date - 1));
-                    } else {
-                        rowDate = new Date(date);
-                    }
-                    
-                    const tr = document.createElement('tr');
+                } else if (isSimpleLayout) {
+                    document.getElementById('from-th').style.display = 'none';
+                    document.getElementById('to-th').style.display = 'none';
                     tr.innerHTML = `
                         <td>${rowDate.toLocaleDateString()}</td>
-                        <td colspan="2">${tasks}</td>
-                        <td style="display: none;"></td>
+                        <td colspan="3">${tasks}</td>
                         <td>${durationStr}</td>
                     `;
-                    previews.invoiceBody.appendChild(tr);
-                });
-            } else {
-                alert('Sheet format not recognized. Header row must contain columns for "Date", "Tasks", and "Duration".');
-            }
+                } else {
+                     previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Sheet format not recognized. Header row must contain "Date", "Tasks", and "Duration".</td></tr>';
+                     return;
+                }
+                previews.invoiceBody.appendChild(tr);
+            });
         }
 
         const totalHours = Math.floor(totalMinutes / 60);
@@ -420,49 +396,73 @@ document.addEventListener('DOMContentLoaded', function() {
         calculateAndDisplayTotals();
     }
     
+    // --- REVISED AND IMPROVED PDF GENERATION ---
     function generatePdf() {
+        const originalButtonText = buttons.generatePdf.textContent;
+        buttons.generatePdf.disabled = true;
+        buttons.generatePdf.textContent = 'Generating PDF...';
+        
         window.scrollTo(0, 0);
+
         const invoiceElement = document.getElementById('invoice-preview');
-        const clientName = inputs.clientCompany.value || 'Invoice';
+        const clientName = (inputs.clientCompany.value || 'Invoice').trim().replace(/\s+/g, '_');
         const invoiceId = previews.invoiceId.textContent;
+        
         const opt = {
-            margin: [0.5, 0.25, 0.5, 0.25],
-            filename: `${clientName}_${invoiceId}.pdf`,
-            pagebreak: { mode: 'css', avoid: ['thead', 'tr', '.invoice-footer'] },
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            margin:       [0.5, 0.25, 0.5, 0.25],
+            filename:     `${clientName}_${invoiceId}.pdf`,
+            pagebreak:    { mode: 'css', avoid: ['thead', 'tr', '.invoice-footer'] },
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { 
+                scale: 2, 
+                useCORS: true, // Crucial for loading external resources like fonts
+                logging: true, // Enable logging for debugging
+            },
+            jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
         };
-        html2pdf().from(invoiceElement).set(opt).save();
+
+        // Use the promise-based API for better control and error handling
+        html2pdf().from(invoiceElement).set(opt).save()
+            .catch(err => {
+                console.error('An error occurred during PDF generation:', err);
+                alert('Failed to generate PDF. This can be caused by ad-blockers or network issues preventing external fonts from loading. Please check the browser console (F12) for more details.');
+            })
+            .finally(() => {
+                // Restore the button to its original state
+                buttons.generatePdf.disabled = false;
+                buttons.generatePdf.textContent = originalButtonText;
+            });
     }
 
     // --- INITIALIZATION & EVENT LISTENERS ---
-    previews.invoiceId.textContent = generateInvoiceId();
-    previews.invoiceDate.textContent = new Date().toLocaleDateString();
-    
-    buttons.loadSheets.addEventListener('click', populateSheetDropdown);
-    buttons.fetchData.addEventListener('click', generateFromSource);
-    inputs.fileUploader.addEventListener('change', (e) => handleFile(e.target.files[0]));
-    
-    inputs.startDate.addEventListener('change', processAndDisplayData);
-    inputs.endDate.addEventListener('change', processAndDisplayData);
-    
-    inputs.billingMethod.addEventListener('change', handleBillingMethodChange);
-    inputs.paymentMethod.addEventListener('input', calculateAndDisplayTotals);
-    inputs.hourlyRate.addEventListener('input', calculateAndDisplayTotals);
-    inputs.fixedRate.addEventListener('input', calculateAndDisplayTotals);
-    
-    // Simplified updatePreview listeners
-    ['clientName', 'clientCompany', 'clientEmail', 'paymentMethod', 'paymentDetails'].forEach(id => {
-        document.getElementById(id).addEventListener('input', updatePreview);
-    });
-    
-    buttons.generatePdf.addEventListener('click', generatePdf);
-    buttons.saveDefaults.addEventListener('click', saveDefaults);
-    buttons.clearDefaults.addEventListener('click', clearDefaults);
-    
-    // --- FINAL SETUP ---
-    loadDefaults(); 
-    updatePreview(); 
-    handleBillingMethodChange();
+    function init() {
+        previews.invoiceId.textContent = generateInvoiceId();
+        previews.invoiceDate.textContent = new Date().toLocaleDateString();
+        
+        buttons.loadSheets.addEventListener('click', populateSheetDropdown);
+        buttons.fetchData.addEventListener('click', generateFromSource);
+        inputs.fileUploader.addEventListener('change', (e) => handleFile(e.target.files[0]));
+        
+        inputs.startDate.addEventListener('change', processAndDisplayData);
+        inputs.endDate.addEventListener('change', processAndDisplayData);
+        
+        inputs.billingMethod.addEventListener('change', handleBillingMethodChange);
+        inputs.paymentMethod.addEventListener('input', calculateAndDisplayTotals);
+        inputs.hourlyRate.addEventListener('input', calculateAndDisplayTotals);
+        inputs.fixedRate.addEventListener('input', calculateAndDisplayTotals);
+        
+        ['clientName', 'clientCompany', 'clientEmail', 'paymentMethod', 'paymentDetails'].forEach(id => {
+            document.getElementById(id).addEventListener('input', updatePreview);
+        });
+        
+        buttons.generatePdf.addEventListener('click', generatePdf);
+        buttons.saveDefaults.addEventListener('click', saveDefaults);
+        buttons.clearDefaults.addEventListener('click', clearDefaults);
+        
+        loadDefaults(); 
+        updatePreview(); 
+        handleBillingMethodChange();
+    }
+
+    init();
 });
