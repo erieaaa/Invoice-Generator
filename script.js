@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     // --- CONFIGURATION ---
     const API_KEY = 'AIzaSyDC19jZi4kwBD-3Pr0bFIdESTw5FrAZO8M'; // Your API Key
+    const PAYONEER_FEE_PERCENTAGE = 0.02; // 2% fee
 
     // --- GLOBAL STATE ---
     let totalMinutes = 0;
@@ -12,17 +13,54 @@ document.addEventListener('DOMContentLoaded', function() {
     const previews = { invoiceId: document.getElementById('preview-invoice-id'), invoiceDate: document.getElementById('preview-invoice-date'), clientName: document.getElementById('preview-client-name'), clientCompany: document.getElementById('preview-client-company'), clientEmail: document.getElementById('preview-client-email'), billingPeriod: document.getElementById('preview-billing-period'), paymentMethod: document.getElementById('preview-payment-method'), paymentDetails: document.getElementById('preview-payment-details'), invoiceBody: document.getElementById('invoice-body'), totalHours: document.getElementById('total-hours'), subtotalContainer: document.getElementById('subtotal-container'), feeContainer: document.getElementById('fee-container'), subtotal: document.getElementById('preview-subtotal'), fee: document.getElementById('preview-fee'), totalAmount: document.getElementById('total-amount'), totalAmountLabel: document.getElementById('total-amount-label'), };
     const buttons = { loadSheets: document.getElementById('load-sheets-btn'), fetchData: document.getElementById('fetch-data-btn'), generatePdf: document.getElementById('generate-pdf-btn'), saveDefaults: document.getElementById('save-defaults-btn'), clearDefaults: document.getElementById('clear-defaults-btn'), };
 
-    // --- HELPER FUNCTION TO PARSE SPREADSHEET ID ---
-    function getSpreadsheetIdFromInput(input) { const value = input.trim(); const match = value.match(/\/d\/([a-zA-Z0-9-_]+)/); if (match && match[1]) { return match[1]; } return value; }
+    // --- TOTALS CALCULATION (WITH FEE LOGIC) ---
+    function calculateAndDisplayTotals() {
+        const method = inputs.billingMethod.value;
+        const paymentMethod = inputs.paymentMethod.value.toLowerCase().trim();
+        let subtotal = 0;
 
-    // --- CORE LOGIC (Functions are correct, no changes here) ---
+        if (method === 'hourly') {
+            const hourlyRate = parseFloat(inputs.hourlyRate.value) || 0;
+            subtotal = (totalMinutes / 60) * hourlyRate;
+        } else {
+            subtotal = parseFloat(inputs.fixedRate.value) || 0;
+        }
+
+        let fee = 0;
+        let totalAmount = subtotal;
+
+        // 1. Always reset the UI to the default state first
+        previews.subtotalContainer.classList.add('hidden');
+        previews.feeContainer.classList.add('hidden');
+        previews.totalAmountLabel.textContent = 'Total Amount';
+        
+        // 2. Check if the Payoneer fee should be applied
+        if (paymentMethod.includes('payoneer') && subtotal > 0) {
+            fee = subtotal * PAYONEER_FEE_PERCENTAGE;
+            totalAmount = subtotal + fee;
+
+            // Update the UI with the fee breakdown
+            previews.subtotal.textContent = `$${subtotal.toFixed(2)}`;
+            previews.fee.textContent = `$${fee.toFixed(2)}`;
+            previews.totalAmountLabel.textContent = 'Grand Total';
+
+            // Show the fee breakdown elements
+            previews.subtotalContainer.classList.remove('hidden');
+            previews.feeContainer.classList.remove('hidden');
+        }
+
+        // 3. Always update the final total amount display
+        previews.totalAmount.textContent = `$${totalAmount.toFixed(2)}`;
+    }
+
+    // --- OTHER CORE FUNCTIONS (UNCHANGED) ---
+    function getSpreadsheetIdFromInput(input) { const value = input.trim(); const match = value.match(/\/d\/([a-zA-Z0-9-_]+)/); if (match && match[1]) { return match[1]; } return value; }
     function saveDefaults() { const defaults = { clientName: inputs.clientName.value, clientCompany: inputs.clientCompany.value, clientEmail: inputs.clientEmail.value, paymentMethod: inputs.paymentMethod.value, paymentDetails: inputs.paymentDetails.value, billingMethod: inputs.billingMethod.value, hourlyRate: inputs.hourlyRate.value, spreadsheetId: inputs.spreadsheetId.value }; localStorage.setItem('invoiceDefaults', JSON.stringify(defaults)); alert('Default client and payment info saved!'); }
     function clearDefaults() { localStorage.removeItem('invoiceDefaults'); alert('Default info cleared!'); }
     function loadDefaults() { const savedDefaults = localStorage.getItem('invoiceDefaults'); if (savedDefaults) { const defaults = JSON.parse(savedDefaults); inputs.clientName.value = defaults.clientName || ''; inputs.clientCompany.value = defaults.clientCompany.value || ''; inputs.clientEmail.value = defaults.clientEmail.value || ''; inputs.paymentMethod.value = defaults.paymentMethod.value || ''; inputs.paymentDetails.value = defaults.paymentDetails.value || ''; inputs.billingMethod.value = defaults.billingMethod.value || 'hourly'; inputs.hourlyRate.value = defaults.hourlyRate.value || '5.00'; inputs.spreadsheetId.value = defaults.spreadsheetId.value || ''; } }
     function formatTime(timeString) { if (!timeString || String(timeString).toUpperCase().includes('AM') || String(timeString).toUpperCase().includes('PM')) { return timeString; } try { let [hours, minutes] = String(timeString).split(':').map(Number); const ampm = hours >= 12 ? 'PM' : 'AM'; hours = hours % 12; hours = hours ? hours : 12; const minutesStr = String(minutes).padStart(2, '0'); return `${hours}:${minutesStr} ${ampm}`; } catch (e) { return timeString; } }
     function parseDurationToMinutes(durationStr) { if (!durationStr) return 0; durationStr = String(durationStr).trim(); if (durationStr.includes(':')) { const [hours, minutes] = durationStr.split(':').map(Number); return (hours || 0) * 60 + (minutes || 0); } else { const decimalHours = parseFloat(durationStr); return isNaN(decimalHours) ? 0 : decimalHours * 60; } }
     function handleBillingMethodChange() { const selectedMethod = inputs.billingMethod.value; if (selectedMethod === 'hourly') { inputGroups.hourlyRate.classList.remove('hidden'); inputGroups.fixedRate.classList.add('hidden'); } else { inputGroups.hourlyRate.classList.add('hidden'); inputGroups.fixedRate.classList.remove('hidden'); } calculateAndDisplayTotals(); }
-    function calculateAndDisplayTotals() { const method = inputs.billingMethod.value; const paymentMethod = inputs.paymentMethod.value.toLowerCase().trim(); let subtotal = 0; if (method === 'hourly') { const hourlyRate = parseFloat(inputs.hourlyRate.value) || 0; subtotal = (totalMinutes / 60) * hourlyRate; } else { subtotal = parseFloat(inputs.fixedRate.value) || 0; } let totalAmount = subtotal; previews.subtotalContainer.classList.add('hidden'); previews.feeContainer.classList.add('hidden'); previews.totalAmountLabel.textContent = method === 'fixed' ? 'Fixed Project Total' : 'Total Amount'; if (paymentMethod.includes('payoneer') && subtotal > 0) { const fee = subtotal * 0.02; totalAmount = subtotal + fee; previews.subtotal.textContent = `$${subtotal.toFixed(2)}`; previews.fee.textContent = `$${fee.toFixed(2)}`; previews.totalAmountLabel.textContent = 'Grand Total'; previews.subtotalContainer.classList.remove('hidden'); previews.feeContainer.classList.remove('hidden'); } previews.totalAmount.textContent = `$${totalAmount.toFixed(2)}`; }
     function generateInvoiceId() { return `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`; }
     function updatePreview() { previews.clientName.textContent = inputs.clientName.value || 'Client Name'; previews.clientCompany.textContent = inputs.clientCompany.value || 'Company Name'; previews.clientEmail.textContent = inputs.clientEmail.value || 'Email Address'; previews.paymentMethod.textContent = inputs.paymentMethod.value || 'N/A'; previews.paymentDetails.textContent = inputs.paymentDetails.value || 'N/A'; const startDateValue = inputs.startDate.value; const endDateValue = inputs.endDate.value; const start = startDateValue ? new Date(startDateValue + 'T00:00:00').toLocaleDateString() : '...'; const end = endDateValue ? new Date(endDateValue + 'T00:00:00').toLocaleDateString() : '...'; previews.billingPeriod.textContent = `${start} – ${end}`; }
     function generateFromSource() { if (inputs.fileUploader.files.length > 0) { handleFile(inputs.fileUploader.files[0]); } else if (inputs.spreadsheetId.value && inputs.sheetSelector.value) { fetchDataFromGoogleSheet(); } else { alert('Please either upload a file OR provide a Google Sheet link and select a tab.'); } }
@@ -32,31 +70,24 @@ document.addEventListener('DOMContentLoaded', function() {
     function processAndDisplayData() { totalMinutes = 0; previews.invoiceBody.innerHTML = ''; document.getElementById('from-th').style.display = 'table-cell'; document.getElementById('to-th').style.display = 'table-cell'; document.getElementById('tasks-th').removeAttribute('colspan'); if (rawData.length === 0) { previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No data found.</td></tr>'; calculateAndDisplayTotals(); return; } if (!inputs.startDate.value || !inputs.endDate.value) { previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Please select a billing period.</td></tr>'; return; } updatePreview(); const headerMap = {}; Object.keys(rawData[0]).forEach(h => { headerMap[h.trim().toLowerCase()] = h; }); const startDate = new Date(inputs.startDate.value + 'T00:00:00'); const endDate = new Date(inputs.endDate.value + 'T23:59:59'); const filteredRows = rawData.filter(row => { const dateStr = row[headerMap.date || headerMap.day]; if (!dateStr) return false; let rowDate; if (typeof dateStr === 'number' && dateStr > 10000) { const excelEpoch = new Date(Date.UTC(1899, 11, 30)); rowDate = new Date(excelEpoch.getTime() + dateStr * 24 * 60 * 60 * 1000); } else { rowDate = new Date(dateStr); } return !isNaN(rowDate) && startDate <= rowDate && rowDate <= endDate; }); if (filteredRows.length === 0) { previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No entries found for the selected period.</td></tr>'; } else { const isDetailedLayout = (headerMap.from && headerMap.to) || (headerMap['start time'] && headerMap['end time']); const isSimpleLayout = headerMap.duration || headerMap.hours; if (isDetailedLayout) { filteredRows.forEach(row => { const dateHeader = headerMap.date || headerMap.day; const tasksHeader = headerMap.tasks || headerMap.note || headerMap.description; const durationHeader = headerMap.duration || headerMap.hours; let rowDate; if (typeof row[dateHeader] === 'number' && row[dateHeader] > 10000) { const excelEpoch = new Date(Date.UTC(1899, 11, 30)); rowDate = new Date(excelEpoch.getTime() + row[dateHeader] * 24 * 60 * 60 * 1000); } else { rowDate = new Date(row[dateHeader]); } const durationStr = String(row[durationHeader] || '0').replace(/\s/g, ''); totalMinutes += parseDurationToMinutes(durationStr); const tr = document.createElement('tr'); tr.innerHTML = `<td>${rowDate.toLocaleDateString()}</td><td>${row[tasksHeader] || ''}</td><td>${formatTime(row[headerMap.from || headerMap['start time']] || '')}</td><td>${formatTime(row[headerMap.to || headerMap['end time']] || '')}</td><td>${durationStr}</td>`; previews.invoiceBody.appendChild(tr); }); } else if (isSimpleLayout) { document.getElementById('from-th').style.display = 'none'; document.getElementById('to-th').style.display = 'none'; document.getElementById('tasks-th').setAttribute('colspan', '3'); filteredRows.forEach(row => { const dateHeader = headerMap.date || headerMap.day; const tasksHeader = headerMap.tasks || headerMap.note || headerMap.description; const durationHeader = headerMap.duration || headerMap.hours; let rowDate; if (typeof row[dateHeader] === 'number' && row[dateHeader] > 10000) { const excelEpoch = new Date(Date.UTC(1899, 11, 30)); rowDate = new Date(excelEpoch.getTime() + row[dateHeader] * 24 * 60 * 60 * 1000); } else { rowDate = new Date(row[dateHeader]); } const durationStr = String(row[durationHeader] || '0').replace(/\s/g, ''); totalMinutes += parseDurationToMinutes(durationStr); const tr = document.createElement('tr'); tr.innerHTML = `<td>${rowDate.toLocaleDateString()}</td><td colspan="3">${row[tasksHeader] || ''}</td><td>${durationStr}</td>`; previews.invoiceBody.appendChild(tr); }); } else { previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Sheet format not recognized.</td></tr>'; } } const totalH = Math.floor(totalMinutes / 60); const totalM = totalMinutes % 60; previews.totalHours.textContent = `${String(totalH).padStart(2, '0')}:${String(totalM).padStart(2, '0')}`; calculateAndDisplayTotals(); }
     function generatePdf() { const originalButtonText = buttons.generatePdf.textContent; buttons.generatePdf.disabled = true; buttons.generatePdf.textContent = 'Generating PDF...'; window.scrollTo(0, 0); const invoiceElement = document.getElementById('invoice-preview'); const clientName = (inputs.clientCompany.value || 'Invoice').trim().replace(/\s+/g, '_'); const invoiceId = previews.invoiceId.textContent; const opt = { margin: [0.5, 0.25, 0.5, 0.25], filename: `${clientName}_${invoiceId}.pdf`, pagebreak: { mode: 'css', avoid: ['thead', 'tr', '.invoice-footer'] }, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, logging: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } }; html2pdf().from(invoiceElement).set(opt).save().catch(err => { console.error('An error occurred during PDF generation:', err); alert('Failed to generate PDF. Ad-blockers or browser settings may be preventing it. Check the console (F12) for details.'); }).finally(() => { buttons.generatePdf.disabled = false; buttons.generatePdf.textContent = originalButtonText; }); }
     
-    // --- THIS IS THE KEY FUNCTION FOR THE FIX ---
     function init() {
         if (previews.invoiceId) previews.invoiceId.textContent = generateInvoiceId();
         if (previews.invoiceDate) previews.invoiceDate.textContent = new Date().toLocaleDateString();
+        const safeAddEventListener = (element, event, handler) => { if (element) { element.addEventListener(event, handler); } else { console.warn(`Attempted to add a listener to a missing element.`); } };
         
-        // Helper to safely add event listeners without causing errors
-        const safeAddEventListener = (element, event, handler) => {
-            if (element) {
-                element.addEventListener(event, handler);
-            } else {
-                console.warn(`Attempted to add a listener to a missing element. This may indicate a typo in an HTML id.`);
-            }
-        };
-
-        // Attach all event listeners
         safeAddEventListener(buttons.loadSheets, 'click', populateSheetDropdown);
         safeAddEventListener(buttons.fetchData, 'click', generateFromSource);
         safeAddEventListener(inputs.fileUploader, 'change', (e) => handleFile(e.target.files[0]));
         safeAddEventListener(inputs.startDate, 'change', processAndDisplayData);
         safeAddEventListener(inputs.endDate, 'change', processAndDisplayData);
         safeAddEventListener(inputs.billingMethod, 'change', handleBillingMethodChange);
+
+        // Add listeners that trigger recalculation
         safeAddEventListener(inputs.hourlyRate, 'input', calculateAndDisplayTotals);
         safeAddEventListener(inputs.fixedRate, 'input', calculateAndDisplayTotals);
+        safeAddEventListener(inputs.paymentMethod, 'input', calculateAndDisplayTotals); // This is the new, crucial listener
 
-        // This loop ensures that typing in any of these fields will trigger a live preview update.
+        // Add listeners for live text preview updates
         ['clientName', 'clientCompany', 'clientEmail', 'paymentMethod', 'paymentDetails'].forEach(key => {
             safeAddEventListener(inputs[key], 'input', updatePreview);
         });
@@ -65,10 +96,9 @@ document.addEventListener('DOMContentLoaded', function() {
         safeAddEventListener(buttons.saveDefaults, 'click', saveDefaults);
         safeAddEventListener(buttons.clearDefaults, 'click', clearDefaults);
         
-        // This sequence ensures that saved defaults are loaded AND the preview is updated on page load.
         loadDefaults();
         updatePreview();
-        handleBillingMethodChange();
+        handleBillingMethodChange(); // This calls calculateAndDisplayTotals on load
     }
 
     init();
