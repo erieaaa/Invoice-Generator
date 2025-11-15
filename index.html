@@ -9,10 +9,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     
-    <!-- ADDED LIBRARIES FOR FILE PARSING -->
+    <!-- Libraries for File Parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
 
+    <!-- Library for PDF Generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
@@ -46,7 +47,6 @@
                 </select>
             </div>
 
-            <!-- FIXED: ADDED THE MISSING FILE UPLOADER ELEMENT -->
             <div class="control-group">
                 <h3>Or Upload a File:</h3>
                 <input type="file" id="file-uploader" accept=".csv, .xlsx">
@@ -117,7 +117,6 @@
                         <tr>
                             <th class="date-col">Date</th>
                             <th class="task-col">Tasks</th>
-                            <!-- FIXED: ADDED THE MISSING IDs -->
                             <th id="from-th" class="time-col">From</th>
                             <th id="to-th" class="time-col">To</th>
                             <th class="time-col">Duration</th>
