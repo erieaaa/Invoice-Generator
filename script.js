@@ -1,9 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     // --- CONFIGURATION ---
-    // IMPORTANT! This is a placeholder. Replace with your actual Google Sheets API key.
-    // WARNING: Do not commit your real API key to public repositories.
-    const API_KEY = 'AIzaSyDC19jZi4kwBD-3Pr0bFIdESTw5FrAZO8M'; 
-
+    const API_KEY = AIzaSyDC19jZi4kwBD-3Pr0bFIdESTw5FrAZO8M'; // Replace with your key
 
     // --- GLOBAL STATE ---
     let totalMinutes = 0;
@@ -560,3 +557,4 @@ document.addEventListener('DOMContentLoaded', function() {
         init();
     });
 });
+
