@@ -12,80 +12,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const previews = { invoiceId: document.getElementById('preview-invoice-id'), invoiceDate: document.getElementById('preview-invoice-date'), clientName: document.getElementById('preview-client-name'), clientCompany: document.getElementById('preview-client-company'), clientEmail: document.getElementById('preview-client-email'), billingPeriod: document.getElementById('preview-billing-period'), paymentMethod: document.getElementById('preview-payment-method'), paymentDetails: document.getElementById('preview-payment-details'), invoiceBody: document.getElementById('invoice-body'), totalHours: document.getElementById('total-hours'), subtotalContainer: document.getElementById('subtotal-container'), feeContainer: document.getElementById('fee-container'), subtotal: document.getElementById('preview-subtotal'), fee: document.getElementById('preview-fee'), totalAmount: document.getElementById('total-amount'), totalAmountLabel: document.getElementById('total-amount-label'), };
     const buttons = { loadSheets: document.getElementById('load-sheets-btn'), fetchData: document.getElementById('fetch-data-btn'), generatePdf: document.getElementById('generate-pdf-btn'), saveDefaults: document.getElementById('save-defaults-btn'), clearDefaults: document.getElementById('clear-defaults-btn'), };
 
-    // --- NEW HELPER FUNCTION TO PARSE SPREADSHEET ID ---
-    function getSpreadsheetIdFromInput(input) {
-        const value = input.trim();
-        // Use a regular expression to find the ID within a URL
-        const match = value.match(/\/d\/([a-zA-Z0-9-_]+)/);
-        if (match && match[1]) {
-            // If a URL is pasted, return the extracted ID
-            return match[1];
-        }
-        // Otherwise, assume the user pasted the ID directly
-        return value;
-    }
+    // --- HELPER FUNCTION TO PARSE SPREADSHEET ID ---
+    function getSpreadsheetIdFromInput(input) { const value = input.trim(); const match = value.match(/\/d\/([a-zA-Z0-9-_]+)/); if (match && match[1]) { return match[1]; } return value; }
 
-    // --- DATA SOURCE LOGIC (GOOGLE SHEETS) - CORRECTED ---
-    async function populateSheetDropdown() {
-        const spreadsheetId = getSpreadsheetIdFromInput(inputs.spreadsheetId.value);
-        if (!spreadsheetId) {
-            alert('Please paste a valid Google Sheet ID or URL first.');
-            return;
-        }
-        
-        // Update the input field to show just the clean ID for clarity
-        inputs.spreadsheetId.value = spreadsheetId; 
-        
-        inputs.sheetSelector.innerHTML = '<option value="">Loading tabs...</option>';
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?key=${API_KEY}`;
-        try {
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}. Check if Sheet is public.`);
-            const data = await response.json();
-            inputs.sheetSelector.innerHTML = '<option value="">-- Select a Tab --</option>';
-            data.sheets.forEach(sheet => {
-                const option = document.createElement('option');
-                option.value = sheet.properties.title;
-                option.textContent = sheet.properties.title;
-                inputs.sheetSelector.appendChild(option);
-            });
-        } catch (error) {
-            console.error('Error fetching sheet names:', error);
-            alert(`Failed to load sheet tabs. ${error.message}`);
-            inputs.sheetSelector.innerHTML = '<option value="">Error loading tabs</option>';
-        }
-    }
-
-    async function fetchDataFromGoogleSheet() {
-        const spreadsheetId = getSpreadsheetIdFromInput(inputs.spreadsheetId.value);
-        const selectedSheet = inputs.sheetSelector.value;
-        if (!spreadsheetId || !selectedSheet) {
-            alert('Please provide a valid Google Sheet ID and select a tab.');
-            return;
-        }
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${encodeURIComponent(selectedSheet)}'?key=${API_KEY}`;
-        try {
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-            const data = await response.json();
-            if (!data.values || data.values.length < 2) {
-                rawData = [];
-            } else {
-                const headers = data.values[0];
-                rawData = data.values.slice(1).map(row => {
-                    const obj = {};
-                    headers.forEach((header, index) => { obj[header] = row[index]; });
-                    return obj;
-                });
-            }
-            processAndDisplayData();
-        } catch (error) {
-            console.error('Error fetching from Google Sheet:', error);
-            alert('Failed to fetch data from Google Sheet. Check console for errors.');
-        }
-    }
-
-    // --- OTHER FUNCTIONS (UNCHANGED) ---
+    // --- CORE LOGIC (Functions are correct, no changes here) ---
     function saveDefaults() { const defaults = { clientName: inputs.clientName.value, clientCompany: inputs.clientCompany.value, clientEmail: inputs.clientEmail.value, paymentMethod: inputs.paymentMethod.value, paymentDetails: inputs.paymentDetails.value, billingMethod: inputs.billingMethod.value, hourlyRate: inputs.hourlyRate.value, spreadsheetId: inputs.spreadsheetId.value }; localStorage.setItem('invoiceDefaults', JSON.stringify(defaults)); alert('Default client and payment info saved!'); }
     function clearDefaults() { localStorage.removeItem('invoiceDefaults'); alert('Default info cleared!'); }
     function loadDefaults() { const savedDefaults = localStorage.getItem('invoiceDefaults'); if (savedDefaults) { const defaults = JSON.parse(savedDefaults); inputs.clientName.value = defaults.clientName || ''; inputs.clientCompany.value = defaults.clientCompany.value || ''; inputs.clientEmail.value = defaults.clientEmail.value || ''; inputs.paymentMethod.value = defaults.paymentMethod.value || ''; inputs.paymentDetails.value = defaults.paymentDetails.value || ''; inputs.billingMethod.value = defaults.billingMethod.value || 'hourly'; inputs.hourlyRate.value = defaults.hourlyRate.value || '5.00'; inputs.spreadsheetId.value = defaults.spreadsheetId.value || ''; } }
@@ -97,9 +27,49 @@ document.addEventListener('DOMContentLoaded', function() {
     function updatePreview() { previews.clientName.textContent = inputs.clientName.value || 'Client Name'; previews.clientCompany.textContent = inputs.clientCompany.value || 'Company Name'; previews.clientEmail.textContent = inputs.clientEmail.value || 'Email Address'; previews.paymentMethod.textContent = inputs.paymentMethod.value || 'N/A'; previews.paymentDetails.textContent = inputs.paymentDetails.value || 'N/A'; const startDateValue = inputs.startDate.value; const endDateValue = inputs.endDate.value; const start = startDateValue ? new Date(startDateValue + 'T00:00:00').toLocaleDateString() : '...'; const end = endDateValue ? new Date(endDateValue + 'T00:00:00').toLocaleDateString() : '...'; previews.billingPeriod.textContent = `${start} – ${end}`; }
     function generateFromSource() { if (inputs.fileUploader.files.length > 0) { handleFile(inputs.fileUploader.files[0]); } else if (inputs.spreadsheetId.value && inputs.sheetSelector.value) { fetchDataFromGoogleSheet(); } else { alert('Please either upload a file OR provide a Google Sheet link and select a tab.'); } }
     function handleFile(file) { if (!file) return; const reader = new FileReader(); const fileExtension = file.name.split('.').pop().toLowerCase(); reader.onload = function(e) { try { const data = e.target.result; let parsedData = []; if (fileExtension === 'csv') { parsedData = Papa.parse(data, { header: true, skipEmptyLines: true }).data; } else if (fileExtension === 'xlsx') { const workbook = XLSX.read(data, { type: 'binary' }); const sheetName = workbook.SheetNames[0]; parsedData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]); } rawData = parsedData; processAndDisplayData(); } catch (error) { console.error("File parsing error:", error); alert(`Could not parse the file. Ensure it is a valid ${fileExtension.toUpperCase()} file.`); } }; if (fileExtension === 'csv') reader.readAsText(file); else if (fileExtension === 'xlsx') reader.readAsBinaryString(file); }
-    function processAndDisplayData() { totalMinutes = 0; previews.invoiceBody.innerHTML = ''; document.getElementById('from-th').style.display = 'table-cell'; document.getElementById('to-th').style.display = 'table-cell'; if (rawData.length === 0) { previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No data found.</td></tr>'; calculateAndDisplayTotals(); return; } if (!inputs.startDate.value || !inputs.endDate.value) { previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Please select a billing period.</td></tr>'; return; } updatePreview(); const headerMap = {}; Object.keys(rawData[0]).forEach(h => { headerMap[h.trim().toLowerCase()] = h; }); const startDate = new Date(inputs.startDate.value + 'T00:00:00'); const endDate = new Date(inputs.endDate.value + 'T23:59:59'); const filteredRows = rawData.filter(row => { const dateStr = row[headerMap.date || headerMap.day]; if (!dateStr) return false; let rowDate; if (typeof dateStr === 'number' && dateStr > 10000) { const excelEpoch = new Date(Date.UTC(1899, 11, 30)); rowDate = new Date(excelEpoch.getTime() + dateStr * 24 * 60 * 60 * 1000); } else { rowDate = new Date(dateStr); } return !isNaN(rowDate) && startDate <= rowDate && rowDate <= endDate; }); if (filteredRows.length === 0) { previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No entries found for the selected period.</td></tr>'; } else { const isDetailedLayout = (headerMap.from && headerMap.to) || (headerMap['start time'] && headerMap['end time']); const isSimpleLayout = headerMap.duration || headerMap.hours; filteredRows.forEach(row => { const dateHeader = headerMap.date || headerMap.day; const tasksHeader = headerMap.tasks || headerMap.note || headerMap.description; const durationHeader = headerMap.duration || headerMap.hours; let rowDate; if (typeof row[dateHeader] === 'number' && row[dateHeader] > 10000) { const excelEpoch = new Date(Date.UTC(1899, 11, 30)); rowDate = new Date(excelEpoch.getTime() + row[dateHeader] * 24 * 60 * 60 * 1000); } else { rowDate = new Date(row[dateHeader]); } const durationStr = row[durationHeader] || '0'; totalMinutes += parseDurationToMinutes(durationStr); const tr = document.createElement('tr'); if (isDetailedLayout) { tr.innerHTML = `<td>${rowDate.toLocaleDateString()}</td><td>${row[tasksHeader] || ''}</td><td>${formatTime(row[headerMap.from || headerMap['start time']] || '')}</td><td>${formatTime(row[headerMap.to || headerMap['end time']] || '')}</td><td>${durationStr}</td>`; } else if (isSimpleLayout) { document.getElementById('from-th').style.display = 'none'; document.getElementById('to-th').style.display = 'none'; tr.innerHTML = `<td>${rowDate.toLocaleDateString()}</td><td colspan="3">${row[tasksHeader] || ''}</td><td>${durationStr}</td>`; } else { previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Sheet format not recognized.</td></tr>'; return; } previews.invoiceBody.appendChild(tr); }); } const totalH = Math.floor(totalMinutes / 60); const totalM = totalMinutes % 60; previews.totalHours.textContent = `${String(totalH).padStart(2, '0')}:${String(totalM).padStart(2, '0')}`; calculateAndDisplayTotals(); }
+    async function populateSheetDropdown() { const spreadsheetId = getSpreadsheetIdFromInput(inputs.spreadsheetId.value); if (!spreadsheetId) { alert('Please paste a valid Google Sheet ID or URL first.'); return; } inputs.spreadsheetId.value = spreadsheetId; inputs.sheetSelector.innerHTML = '<option value="">Loading tabs...</option>'; const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?key=${API_KEY}`; try { const response = await fetch(url); if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}. Check if Sheet is public.`); const data = await response.json(); inputs.sheetSelector.innerHTML = '<option value="">-- Select a Tab --</option>'; data.sheets.forEach(sheet => { const option = document.createElement('option'); option.value = sheet.properties.title; option.textContent = sheet.properties.title; inputs.sheetSelector.appendChild(option); }); } catch (error) { console.error('Error fetching sheet names:', error); alert(`Failed to load sheet tabs. ${error.message}`); inputs.sheetSelector.innerHTML = '<option value="">Error loading tabs</option>'; } }
+    async function fetchDataFromGoogleSheet() { const spreadsheetId = getSpreadsheetIdFromInput(inputs.spreadsheetId.value); const selectedSheet = inputs.sheetSelector.value; if (!spreadsheetId || !selectedSheet) { alert('Please provide a valid Google Sheet ID and select a tab.'); return; } const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${encodeURIComponent(selectedSheet)}'?key=${API_KEY}`; try { const response = await fetch(url); if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`); const data = await response.json(); if (!data.values || data.values.length < 2) { rawData = []; } else { const headers = data.values[0]; rawData = data.values.slice(1).map(row => { const obj = {}; headers.forEach((header, index) => { obj[header] = row[index]; }); return obj; }); } processAndDisplayData(); } catch (error) { console.error('Error fetching from Google Sheet:', error); alert('Failed to fetch data from Google Sheet. Check console for errors.'); } }
+    function processAndDisplayData() { totalMinutes = 0; previews.invoiceBody.innerHTML = ''; document.getElementById('from-th').style.display = 'table-cell'; document.getElementById('to-th').style.display = 'table-cell'; document.getElementById('tasks-th').removeAttribute('colspan'); if (rawData.length === 0) { previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No data found.</td></tr>'; calculateAndDisplayTotals(); return; } if (!inputs.startDate.value || !inputs.endDate.value) { previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Please select a billing period.</td></tr>'; return; } updatePreview(); const headerMap = {}; Object.keys(rawData[0]).forEach(h => { headerMap[h.trim().toLowerCase()] = h; }); const startDate = new Date(inputs.startDate.value + 'T00:00:00'); const endDate = new Date(inputs.endDate.value + 'T23:59:59'); const filteredRows = rawData.filter(row => { const dateStr = row[headerMap.date || headerMap.day]; if (!dateStr) return false; let rowDate; if (typeof dateStr === 'number' && dateStr > 10000) { const excelEpoch = new Date(Date.UTC(1899, 11, 30)); rowDate = new Date(excelEpoch.getTime() + dateStr * 24 * 60 * 60 * 1000); } else { rowDate = new Date(dateStr); } return !isNaN(rowDate) && startDate <= rowDate && rowDate <= endDate; }); if (filteredRows.length === 0) { previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No entries found for the selected period.</td></tr>'; } else { const isDetailedLayout = (headerMap.from && headerMap.to) || (headerMap['start time'] && headerMap['end time']); const isSimpleLayout = headerMap.duration || headerMap.hours; if (isDetailedLayout) { filteredRows.forEach(row => { const dateHeader = headerMap.date || headerMap.day; const tasksHeader = headerMap.tasks || headerMap.note || headerMap.description; const durationHeader = headerMap.duration || headerMap.hours; let rowDate; if (typeof row[dateHeader] === 'number' && row[dateHeader] > 10000) { const excelEpoch = new Date(Date.UTC(1899, 11, 30)); rowDate = new Date(excelEpoch.getTime() + row[dateHeader] * 24 * 60 * 60 * 1000); } else { rowDate = new Date(row[dateHeader]); } const durationStr = String(row[durationHeader] || '0').replace(/\s/g, ''); totalMinutes += parseDurationToMinutes(durationStr); const tr = document.createElement('tr'); tr.innerHTML = `<td>${rowDate.toLocaleDateString()}</td><td>${row[tasksHeader] || ''}</td><td>${formatTime(row[headerMap.from || headerMap['start time']] || '')}</td><td>${formatTime(row[headerMap.to || headerMap['end time']] || '')}</td><td>${durationStr}</td>`; previews.invoiceBody.appendChild(tr); }); } else if (isSimpleLayout) { document.getElementById('from-th').style.display = 'none'; document.getElementById('to-th').style.display = 'none'; document.getElementById('tasks-th').setAttribute('colspan', '3'); filteredRows.forEach(row => { const dateHeader = headerMap.date || headerMap.day; const tasksHeader = headerMap.tasks || headerMap.note || headerMap.description; const durationHeader = headerMap.duration || headerMap.hours; let rowDate; if (typeof row[dateHeader] === 'number' && row[dateHeader] > 10000) { const excelEpoch = new Date(Date.UTC(1899, 11, 30)); rowDate = new Date(excelEpoch.getTime() + row[dateHeader] * 24 * 60 * 60 * 1000); } else { rowDate = new Date(row[dateHeader]); } const durationStr = String(row[durationHeader] || '0').replace(/\s/g, ''); totalMinutes += parseDurationToMinutes(durationStr); const tr = document.createElement('tr'); tr.innerHTML = `<td>${rowDate.toLocaleDateString()}</td><td colspan="3">${row[tasksHeader] || ''}</td><td>${durationStr}</td>`; previews.invoiceBody.appendChild(tr); }); } else { previews.invoiceBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Sheet format not recognized.</td></tr>'; } } const totalH = Math.floor(totalMinutes / 60); const totalM = totalMinutes % 60; previews.totalHours.textContent = `${String(totalH).padStart(2, '0')}:${String(totalM).padStart(2, '0')}`; calculateAndDisplayTotals(); }
     function generatePdf() { const originalButtonText = buttons.generatePdf.textContent; buttons.generatePdf.disabled = true; buttons.generatePdf.textContent = 'Generating PDF...'; window.scrollTo(0, 0); const invoiceElement = document.getElementById('invoice-preview'); const clientName = (inputs.clientCompany.value || 'Invoice').trim().replace(/\s+/g, '_'); const invoiceId = previews.invoiceId.textContent; const opt = { margin: [0.5, 0.25, 0.5, 0.25], filename: `${clientName}_${invoiceId}.pdf`, pagebreak: { mode: 'css', avoid: ['thead', 'tr', '.invoice-footer'] }, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, logging: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } }; html2pdf().from(invoiceElement).set(opt).save().catch(err => { console.error('An error occurred during PDF generation:', err); alert('Failed to generate PDF. Ad-blockers or browser settings may be preventing it. Check the console (F12) for details.'); }).finally(() => { buttons.generatePdf.disabled = false; buttons.generatePdf.textContent = originalButtonText; }); }
-    function init() { previews.invoiceId.textContent = generateInvoiceId(); previews.invoiceDate.textContent = new Date().toLocaleDateString(); if (buttons.loadSheets) buttons.loadSheets.addEventListener('click', populateSheetDropdown); if (buttons.fetchData) buttons.fetchData.addEventListener('click', generateFromSource); if (inputs.fileUploader) inputs.fileUploader.addEventListener('change', (e) => handleFile(e.target.files[0])); if (inputs.startDate) inputs.startDate.addEventListener('change', processAndDisplayData); if (inputs.endDate) inputs.endDate.addEventListener('change', processAndDisplayData); if (inputs.billingMethod) inputs.billingMethod.addEventListener('change', handleBillingMethodChange); if (inputs.hourlyRate) inputs.hourlyRate.addEventListener('input', calculateAndDisplayTotals); if (inputs.fixedRate) inputs.fixedRate.addEventListener('input', calculateAndDisplayTotals); ['clientName', 'clientCompany', 'clientEmail', 'paymentMethod', 'paymentDetails'].forEach(key => { const element = inputs[key]; if (element) { element.addEventListener('input', updatePreview); } else { console.warn(`Initialization warning: Element for '${key}' was not found.`); } }); if (buttons.generatePdf) buttons.generatePdf.addEventListener('click', generatePdf); if (buttons.saveDefaults) buttons.saveDefaults.addEventListener('click', saveDefaults); if (buttons.clearDefaults) buttons.clearDefaults.addEventListener('click', clearDefaults); loadDefaults(); updatePreview(); handleBillingMethodChange(); }
+    
+    // --- THIS IS THE KEY FUNCTION FOR THE FIX ---
+    function init() {
+        if (previews.invoiceId) previews.invoiceId.textContent = generateInvoiceId();
+        if (previews.invoiceDate) previews.invoiceDate.textContent = new Date().toLocaleDateString();
+        
+        // Helper to safely add event listeners without causing errors
+        const safeAddEventListener = (element, event, handler) => {
+            if (element) {
+                element.addEventListener(event, handler);
+            } else {
+                console.warn(`Attempted to add a listener to a missing element. This may indicate a typo in an HTML id.`);
+            }
+        };
+
+        // Attach all event listeners
+        safeAddEventListener(buttons.loadSheets, 'click', populateSheetDropdown);
+        safeAddEventListener(buttons.fetchData, 'click', generateFromSource);
+        safeAddEventListener(inputs.fileUploader, 'change', (e) => handleFile(e.target.files[0]));
+        safeAddEventListener(inputs.startDate, 'change', processAndDisplayData);
+        safeAddEventListener(inputs.endDate, 'change', processAndDisplayData);
+        safeAddEventListener(inputs.billingMethod, 'change', handleBillingMethodChange);
+        safeAddEventListener(inputs.hourlyRate, 'input', calculateAndDisplayTotals);
+        safeAddEventListener(inputs.fixedRate, 'input', calculateAndDisplayTotals);
+
+        // This loop ensures that typing in any of these fields will trigger a live preview update.
+        ['clientName', 'clientCompany', 'clientEmail', 'paymentMethod', 'paymentDetails'].forEach(key => {
+            safeAddEventListener(inputs[key], 'input', updatePreview);
+        });
+
+        safeAddEventListener(buttons.generatePdf, 'click', generatePdf);
+        safeAddEventListener(buttons.saveDefaults, 'click', saveDefaults);
+        safeAddEventListener(buttons.clearDefaults, 'click', clearDefaults);
+        
+        // This sequence ensures that saved defaults are loaded AND the preview is updated on page load.
+        loadDefaults();
+        updatePreview();
+        handleBillingMethodChange();
+    }
 
     init();
 });
