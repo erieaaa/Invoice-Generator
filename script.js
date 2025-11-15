@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     // --- CONFIGURATION ---
-    const API_KEY = AIzaSyDC19jZi4kwBD-3Pr0bFIdESTw5FrAZO8M'; // Replace with your key
+    const API_KEY = 'AIzaSyDC19jZi4kwBD-3Pr0bFIdESTw5FrAZO8M'; // Replace with your key
 
     // --- GLOBAL STATE ---
     let totalMinutes = 0;
@@ -557,4 +557,5 @@ document.addEventListener('DOMContentLoaded', function() {
         init();
     });
 });
+
 
