@@ -8,56 +8,137 @@ document.addEventListener('DOMContentLoaded', function() {
     let rawData = [];
 
     // --- ELEMENT SELECTORS ---
-    const inputs = { clientName: document.getElementById('client-name'), clientCompany: document.getElementById('client-company'), clientEmail: document.getElementById('client-email'), spreadsheetId: document.getElementById('spreadsheet-id'), sheetSelector: document.getElementById('sheet-selector'), fileUploader: document.getElementById('file-uploader'), startDate: document.getElementById('start-date'), endDate: document.getElementById('end-date'), paymentMethod: document.getElementById('payment-method'), paymentDetails: document.getElementById('payment-details'), billingMethod: document.getElementById('billing-method'), hourlyRate: document.getElementById('hourly-rate'), fixedRate: document.getElementById('fixed-rate'), };
+    const inputs = { clientName: document.getElementById('client-name'), clientCompany: document.getElementById('client-company'), clientEmail: document.getElementById('client-email'), spreadsheetId: document.getElementById('spreadsheet-id'), sheetSelector: document.getElementById('sheet-selector'), fileUploader: document.getElementById('file-uploader'), startDate: document.getElementById('start-date'), endDate: document.getElementById('end-date'), paymentMethod: document.getElementById('payment-method'), paymentDetails: document.getElementById('payment-details'), billingMethod: document.getElementById('billing-method'), hourlyRate: document.getElementById('hourly-rate'), fixedRate: document.getElementById('fixed-rate'), chargesList: document.getElementById('other-charges-list'), };
     const inputGroups = { hourlyRate: document.getElementById('hourly-rate-group'), fixedRate: document.getElementById('fixed-rate-group'), };
-    const previews = { invoiceId: document.getElementById('preview-invoice-id'), invoiceDate: document.getElementById('preview-invoice-date'), clientName: document.getElementById('preview-client-name'), clientCompany: document.getElementById('preview-client-company'), clientEmail: document.getElementById('preview-client-email'), billingPeriod: document.getElementById('preview-billing-period'), paymentMethod: document.getElementById('preview-payment-method'), paymentDetails: document.getElementById('preview-payment-details'), invoiceBody: document.getElementById('invoice-body'), totalHours: document.getElementById('total-hours'), subtotalContainer: document.getElementById('subtotal-container'), feeContainer: document.getElementById('fee-container'), subtotal: document.getElementById('preview-subtotal'), fee: document.getElementById('preview-fee'), totalAmount: document.getElementById('total-amount'), totalAmountLabel: document.getElementById('total-amount-label'), };
-    const buttons = { loadSheets: document.getElementById('load-sheets-btn'), fetchData: document.getElementById('fetch-data-btn'), generatePdf: document.getElementById('generate-pdf-btn'), saveDefaults: document.getElementById('save-defaults-btn'), clearDefaults: document.getElementById('clear-defaults-btn'), };
+    const previews = { invoiceId: document.getElementById('preview-invoice-id'), invoiceDate: document.getElementById('preview-invoice-date'), clientName: document.getElementById('preview-client-name'), clientCompany: document.getElementById('preview-client-company'), clientEmail: document.getElementById('preview-client-email'), billingPeriod: document.getElementById('preview-billing-period'), paymentMethod: document.getElementById('preview-payment-method'), paymentDetails: document.getElementById('preview-payment-details'), invoiceBody: document.getElementById('invoice-body'), totalHours: document.getElementById('total-hours'), breakdown: document.getElementById('breakdown'), servicesLabel: document.getElementById('preview-services-label'), services: document.getElementById('preview-services'), chargesBreakdown: document.getElementById('charges-breakdown'), subtotalContainer: document.getElementById('subtotal-container'), feeContainer: document.getElementById('fee-container'), subtotal: document.getElementById('preview-subtotal'), fee: document.getElementById('preview-fee'), totalAmount: document.getElementById('total-amount'), totalAmountLabel: document.getElementById('total-amount-label'), };
+    const buttons = { loadSheets: document.getElementById('load-sheets-btn'), fetchData: document.getElementById('fetch-data-btn'), generatePdf: document.getElementById('generate-pdf-btn'), saveDefaults: document.getElementById('save-defaults-btn'), clearDefaults: document.getElementById('clear-defaults-btn'), addCharge: document.getElementById('add-charge-btn'), };
 
-    // --- TOTALS CALCULATION (WITH FEE LOGIC) ---
+    // --- MONEY FORMAT (handles negatives, e.g. discounts) ---
+    function formatMoney(value) {
+        const sign = value < 0 ? '-' : '';
+        return `${sign}$${Math.abs(value).toFixed(2)}`;
+    }
+
+    // --- OTHER CHARGES ---
+    function addChargeRow(description = '', amount = '') {
+        const row = document.createElement('div');
+        row.className = 'charge-row';
+
+        const descInput = document.createElement('input');
+        descInput.type = 'text';
+        descInput.className = 'charge-desc';
+        descInput.placeholder = 'What is it for? (e.g., Software subscription)';
+        descInput.value = description;
+
+        const amountInput = document.createElement('input');
+        amountInput.type = 'number';
+        amountInput.className = 'charge-amount';
+        amountInput.step = '0.01';
+        amountInput.placeholder = 'Amount ($)';
+        amountInput.value = amount;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'remove-charge-btn';
+        removeBtn.title = 'Remove charge';
+        removeBtn.textContent = '×';
+
+        descInput.addEventListener('input', calculateAndDisplayTotals);
+        amountInput.addEventListener('input', calculateAndDisplayTotals);
+        removeBtn.addEventListener('click', () => { row.remove(); calculateAndDisplayTotals(); });
+
+        row.append(descInput, amountInput, removeBtn);
+        inputs.chargesList.appendChild(row);
+        if (!description) descInput.focus();
+    }
+
+    // Returns all charges, including blank ones (used for saving defaults)
+    function readChargeRows() {
+        return Array.from(inputs.chargesList.querySelectorAll('.charge-row')).map(row => ({
+            description: row.querySelector('.charge-desc').value.trim(),
+            amount: row.querySelector('.charge-amount').value,
+        }));
+    }
+
+    // Returns only charges that have an actual amount (used for totals)
+    function getOtherCharges() {
+        return readChargeRows()
+            .map(c => ({ description: c.description || 'Other charge', amount: parseFloat(c.amount) }))
+            .filter(c => !isNaN(c.amount) && c.amount !== 0);
+    }
+
+    // --- TOTALS CALCULATION (WITH OTHER CHARGES + FEE LOGIC) ---
     function calculateAndDisplayTotals() {
         const method = inputs.billingMethod.value;
         const paymentMethod = inputs.paymentMethod.value.toLowerCase().trim();
-        let subtotal = 0;
+        let servicesAmount = 0;
 
         if (method === 'hourly') {
             const hourlyRate = parseFloat(inputs.hourlyRate.value) || 0;
-            subtotal = (totalMinutes / 60) * hourlyRate;
+            servicesAmount = (totalMinutes / 60) * hourlyRate;
+            const h = Math.floor(totalMinutes / 60);
+            const m = Math.round(totalMinutes % 60);
+            previews.servicesLabel.textContent = `Services (${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} hrs × $${hourlyRate.toFixed(2)})`;
         } else {
-            subtotal = parseFloat(inputs.fixedRate.value) || 0;
+            servicesAmount = parseFloat(inputs.fixedRate.value) || 0;
+            previews.servicesLabel.textContent = 'Services (fixed rate)';
         }
 
+        // Other charges
+        const charges = getOtherCharges();
+        const chargesTotal = charges.reduce((sum, c) => sum + c.amount, 0);
+        const subtotal = servicesAmount + chargesTotal;
+
+        // Render the charges in the breakdown
+        previews.chargesBreakdown.innerHTML = '';
+        charges.forEach(c => {
+            const row = document.createElement('div');
+            row.className = 'breakdown-row';
+            const label = document.createElement('span');
+            label.textContent = c.description;
+            const value = document.createElement('span');
+            value.textContent = formatMoney(c.amount);
+            row.append(label, value);
+            previews.chargesBreakdown.appendChild(row);
+        });
+
+        // Payoneer fee (applied to services + other charges)
         let fee = 0;
-        let totalAmount = subtotal;
+        const applyFee = paymentMethod.includes('payoneer') && subtotal > 0;
+        if (applyFee) fee = subtotal * PAYONEER_FEE_PERCENTAGE;
+        const totalAmount = subtotal + fee;
 
-        // 1. Always reset the UI to the default state first
-        previews.subtotalContainer.classList.add('hidden');
-        previews.feeContainer.classList.add('hidden');
-        previews.totalAmountLabel.textContent = 'Total Amount';
-        
-        // 2. Check if the Payoneer fee should be applied
-        if (paymentMethod.includes('payoneer') && subtotal > 0) {
-            fee = subtotal * PAYONEER_FEE_PERCENTAGE;
-            totalAmount = subtotal + fee;
+        // Show/hide breakdown pieces
+        const showBreakdown = charges.length > 0 || applyFee;
+        previews.breakdown.classList.toggle('hidden', !showBreakdown);
+        previews.subtotalContainer.classList.toggle('hidden', !(charges.length > 0 && applyFee));
+        previews.feeContainer.classList.toggle('hidden', !applyFee);
 
-            // Update the UI with the fee breakdown
-            previews.subtotal.textContent = `$${subtotal.toFixed(2)}`;
-            previews.fee.textContent = `$${fee.toFixed(2)}`;
-            previews.totalAmountLabel.textContent = 'Grand Total';
-
-            // Show the fee breakdown elements
-            previews.subtotalContainer.classList.remove('hidden');
-            previews.feeContainer.classList.remove('hidden');
-        }
-
-        // 3. Always update the final total amount display
-        previews.totalAmount.textContent = `$${totalAmount.toFixed(2)}`;
+        previews.services.textContent = formatMoney(servicesAmount);
+        previews.subtotal.textContent = formatMoney(subtotal);
+        previews.fee.textContent = formatMoney(fee);
+        previews.totalAmountLabel.textContent = showBreakdown ? 'Grand Total' : 'Total Amount';
+        previews.totalAmount.textContent = formatMoney(totalAmount);
     }
 
-    // --- OTHER CORE FUNCTIONS (UNCHANGED) ---
+    // --- OTHER CORE FUNCTIONS ---
     function getSpreadsheetIdFromInput(input) { const value = input.trim(); const match = value.match(/\/d\/([a-zA-Z0-9-_]+)/); if (match && match[1]) { return match[1]; } return value; }
-    function saveDefaults() { const defaults = { clientName: inputs.clientName.value, clientCompany: inputs.clientCompany.value, clientEmail: inputs.clientEmail.value, paymentMethod: inputs.paymentMethod.value, paymentDetails: inputs.paymentDetails.value, billingMethod: inputs.billingMethod.value, hourlyRate: inputs.hourlyRate.value, spreadsheetId: inputs.spreadsheetId.value }; localStorage.setItem('invoiceDefaults', JSON.stringify(defaults)); alert('Default client and payment info saved!'); }
+    function saveDefaults() { const defaults = { clientName: inputs.clientName.value, clientCompany: inputs.clientCompany.value, clientEmail: inputs.clientEmail.value, paymentMethod: inputs.paymentMethod.value, paymentDetails: inputs.paymentDetails.value, billingMethod: inputs.billingMethod.value, hourlyRate: inputs.hourlyRate.value, spreadsheetId: inputs.spreadsheetId.value, otherCharges: readChargeRows().filter(c => c.description || c.amount) }; localStorage.setItem('invoiceDefaults', JSON.stringify(defaults)); alert('Default client, payment info and other charges saved!'); }
     function clearDefaults() { localStorage.removeItem('invoiceDefaults'); alert('Default info cleared!'); }
-    function loadDefaults() { const savedDefaults = localStorage.getItem('invoiceDefaults'); if (savedDefaults) { const defaults = JSON.parse(savedDefaults); inputs.clientName.value = defaults.clientName || ''; inputs.clientCompany.value = defaults.clientCompany.value || ''; inputs.clientEmail.value = defaults.clientEmail.value || ''; inputs.paymentMethod.value = defaults.paymentMethod.value || ''; inputs.paymentDetails.value = defaults.paymentDetails.value || ''; inputs.billingMethod.value = defaults.billingMethod.value || 'hourly'; inputs.hourlyRate.value = defaults.hourlyRate.value || '5.00'; inputs.spreadsheetId.value = defaults.spreadsheetId.value || ''; } }
+    function loadDefaults() {
+        const savedDefaults = localStorage.getItem('invoiceDefaults');
+        if (!savedDefaults) return;
+        const defaults = JSON.parse(savedDefaults);
+        inputs.clientName.value = defaults.clientName || '';
+        inputs.clientCompany.value = defaults.clientCompany || '';
+        inputs.clientEmail.value = defaults.clientEmail || '';
+        inputs.paymentMethod.value = defaults.paymentMethod || '';
+        inputs.paymentDetails.value = defaults.paymentDetails || '';
+        inputs.billingMethod.value = defaults.billingMethod || 'hourly';
+        inputs.hourlyRate.value = defaults.hourlyRate || '5.00';
+        inputs.spreadsheetId.value = defaults.spreadsheetId || '';
+        (defaults.otherCharges || []).forEach(c => addChargeRow(c.description, c.amount));
+    }
     function formatTime(timeString) { if (!timeString || String(timeString).toUpperCase().includes('AM') || String(timeString).toUpperCase().includes('PM')) { return timeString; } try { let [hours, minutes] = String(timeString).split(':').map(Number); const ampm = hours >= 12 ? 'PM' : 'AM'; hours = hours % 12; hours = hours ? hours : 12; const minutesStr = String(minutes).padStart(2, '0'); return `${hours}:${minutesStr} ${ampm}`; } catch (e) { return timeString; } }
     function parseDurationToMinutes(durationStr) { if (!durationStr) return 0; durationStr = String(durationStr).trim(); if (durationStr.includes(':')) { const [hours, minutes] = durationStr.split(':').map(Number); return (hours || 0) * 60 + (minutes || 0); } else { const decimalHours = parseFloat(durationStr); return isNaN(decimalHours) ? 0 : decimalHours * 60; } }
     function handleBillingMethodChange() { const selectedMethod = inputs.billingMethod.value; if (selectedMethod === 'hourly') { inputGroups.hourlyRate.classList.remove('hidden'); inputGroups.fixedRate.classList.add('hidden'); } else { inputGroups.hourlyRate.classList.add('hidden'); inputGroups.fixedRate.classList.remove('hidden'); } calculateAndDisplayTotals(); }
@@ -85,7 +166,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Add listeners that trigger recalculation
         safeAddEventListener(inputs.hourlyRate, 'input', calculateAndDisplayTotals);
         safeAddEventListener(inputs.fixedRate, 'input', calculateAndDisplayTotals);
-        safeAddEventListener(inputs.paymentMethod, 'input', calculateAndDisplayTotals); // This is the new, crucial listener
+        safeAddEventListener(inputs.paymentMethod, 'input', calculateAndDisplayTotals);
+        safeAddEventListener(buttons.addCharge, 'click', () => addChargeRow());
 
         // Add listeners for live text preview updates
         ['clientName', 'clientCompany', 'clientEmail', 'paymentMethod', 'paymentDetails'].forEach(key => {
