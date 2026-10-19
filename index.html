@@ -77,6 +77,15 @@
                     </div>
                 </div>
             </div>
+
+            <!-- NEW: Other Charges -->
+            <div class="control-group">
+                <h3>Other Charges:</h3>
+                <p class="hint">Add extra items like software, equipment or reimbursements. Use a negative amount for a discount.</p>
+                <div id="other-charges-list"></div>
+                <button id="add-charge-btn" type="button" class="util-button">+ Add Charge</button>
+            </div>
+
             <div class="control-group">
                 <h3>Payment Info:</h3>
                 <input type="text" id="payment-method" placeholder="Payment Method (e.g., Payoneer, PayPal)">
@@ -133,14 +142,22 @@
                     <div class="total-section">
                         <p>Total Hours</p>
                         <h2 id="total-hours">00:00</h2>
-                        
-                        <div id="subtotal-container" class="hidden">
-                            <p class="total-amount-label">Subtotal</p>
-                            <h2 id="preview-subtotal" class="total-amount-value">$0.00</h2>
-                        </div>
-                        <div id="fee-container" class="hidden">
-                            <p class="total-amount-label">Payoneer Fee (2%)</p>
-                            <h2 id="preview-fee" class="total-amount-value">$0.00</h2>
+
+                        <!-- Breakdown: services, other charges, subtotal, fee -->
+                        <div id="breakdown" class="breakdown hidden">
+                            <div class="breakdown-row">
+                                <span id="preview-services-label">Services</span>
+                                <span id="preview-services">$0.00</span>
+                            </div>
+                            <div id="charges-breakdown"></div>
+                            <div id="subtotal-container" class="breakdown-row breakdown-subtotal hidden">
+                                <span>Subtotal</span>
+                                <span id="preview-subtotal">$0.00</span>
+                            </div>
+                            <div id="fee-container" class="breakdown-row hidden">
+                                <span>Payoneer Fee (2%)</span>
+                                <span id="preview-fee">$0.00</span>
+                            </div>
                         </div>
 
                         <p id="total-amount-label" class="total-amount-label">Total Amount</p>
