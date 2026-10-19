@@ -122,13 +122,12 @@ select {
     table-layout: fixed;
 }
 
-/* Find this existing rule */
 .items-table th, .items-table td {
     padding: 0.8rem;
     text-align: left;
     overflow-wrap: break-word;
     word-wrap: break-word;
-    vertical-align: top; /* ADD THIS LINE */
+    vertical-align: top;
 }
 
 .items-table thead {
@@ -140,28 +139,20 @@ select {
     background-color: var(--bg-color);
 }
 
-/* --- CORRECTED WIDTHS --- */
-.items-table .date-col {
-    width: 15%;
-}
-.items-table .task-col {
-    width: 50%; /* Reduced from 55% */
-}
-.items-table .time-col {
-    width: 11.66%; /* Adjusted for better balance */
-}
+.items-table .date-col { width: 15%; }
+.items-table .task-col { width: 50%; }
+.items-table .time-col { width: 11.66%; }
 
-/* --- NEW RULE FOR ALIGNMENT --- */
 .items-table th:last-child,
 .items-table td:last-child {
     text-align: right;
 }
 
-.invoice-footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); page-break-inside: avoid; }
+.invoice-footer { display: flex; justify-content: space-between; align-items: flex-end; gap: 2rem; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); page-break-inside: avoid; }
 .payment-info h4 { margin: 0 0 0.5rem 0; }
 .payment-info p { margin: 0; }
 pre { font-family: 'Poppins', sans-serif; margin: 5px 0 0; white-space: pre-wrap; }
-.total-section { text-align: right; }
+.total-section { text-align: right; min-width: 260px; }
 .total-section p { margin: 0; font-size: 16px; }
 .total-section h2 { margin: 5px 0 0; font-size: 2.5em; color: var(--primary-color); }
 
@@ -176,7 +167,7 @@ pre { font-family: 'Poppins', sans-serif; margin: 5px 0 0; white-space: pre-wrap
 }
 
 .hidden {
-    display: none;
+    display: none !important;
 }
 
 .billing-method-inputs {
@@ -202,4 +193,60 @@ pre { font-family: 'Poppins', sans-serif; margin: 5px 0 0; white-space: pre-wrap
 
 .util-button-secondary {
     background-color: #6c757d;
+}
+
+/* --- OTHER CHARGES (controls) --- */
+.hint {
+    margin: -0.25rem 0 0.75rem;
+    font-size: 12px;
+    color: #888;
+}
+
+.charge-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+}
+
+.charge-row .charge-desc { flex: 2; min-width: 0; }
+.charge-row .charge-amount { flex: 1; min-width: 0; }
+
+.remove-charge-btn {
+    width: auto;
+    margin-top: 0;
+    padding: 0.6rem 0.9rem;
+    background-color: #dc3545;
+    font-size: 16px;
+    line-height: 1;
+}
+
+/* --- BREAKDOWN (invoice preview) --- */
+.breakdown {
+    margin-top: 1.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed var(--border-color);
+}
+
+.breakdown-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 0.25rem 0;
+    font-size: 14px;
+}
+
+.breakdown-row span:first-child {
+    text-align: left;
+    overflow-wrap: anywhere;
+}
+
+.breakdown-row span:last-child {
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.breakdown-subtotal {
+    border-top: 1px solid var(--border-color);
+    margin-top: 0.25rem;
+    padding-top: 0.5rem;
 }
